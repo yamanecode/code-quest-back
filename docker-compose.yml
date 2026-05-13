@@ -4,7 +4,7 @@ services:
     container_name: codequest_db
     environment:
       POSTGRES_USER: codequest
-      POSTGRES_PASSWORD: codequest123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: codequest
     ports:
       - "5432:5432"
