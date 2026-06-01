@@ -5,7 +5,7 @@ from typing import Any
 from app.database import get_db
 from app.models.models import User, Challenge
 from app.core.deps import get_current_user, require_professor
-from app.ai.ai_service import tutor_agent, generate_challenge
+from app.ai.ai_service import tutor_agent, generate_challenge, generate_daily_challenge
 
 router = APIRouter(prefix="/tutor", tags=["tutor"])
 
@@ -54,3 +54,39 @@ async def generate(
 ):
     result = await generate_challenge(body.topic, body.type, body.difficulty)
     return {"raw": result}
+
+import json
+from app.models.models import Challenge, ChallengeType, ChallengeCategory
+
+@router.post("/generate-daily")
+async def generate_daily(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    raw = await generate_daily_challenge()
+    
+    # Strip markdown fences if Gemini wraps it
+    clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    
+    try:
+        data = json.loads(clean)
+    except Exception:
+        raise HTTPException(status_code=500, detail=f"AI returned invalid JSON: {raw[:200]}")
+    
+    # Replace current daily
+    db.query(Challenge).filter(Challenge.is_daily == True).update({"is_daily": False})
+    
+    challenge = Challenge(
+        title=data["title"],
+        description=data["description"],
+        difficulty=4,
+        category=ChallengeCategory.algorithm,
+        type=ChallengeType.steps,
+        content=data["content"],
+        is_daily=True,
+        created_by=current_user.id,
+    )
+    db.add(challenge)
+    db.commit()
+    db.refresh(challenge)
+    return challenge

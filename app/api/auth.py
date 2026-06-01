@@ -34,9 +34,3 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(user.id, user.role.value)
     return {"access_token": token}
-
-
-@router.get("/me", response_model=UserResponse)
-def me(db: Session = Depends(get_db), token: str = Depends(lambda: None)):
-    # placeholder — we'll add proper token dependency next
-    raise HTTPException(status_code=501, detail="Use /me after adding auth dependency")

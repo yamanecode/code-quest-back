@@ -4,7 +4,7 @@ from app.database import get_db
 from app.models.models import User, Challenge, Submission
 from app.schemas.submission import SubmissionCreate, SubmissionResponse
 from app.core.deps import get_current_user
-from app.services.xp_service import XP_TABLE, grant_xp, check_badges
+from app.services.xp_service import XP_TABLE, grant_xp, check_badges, update_streak
 from app.ai.ai_service import feedback_agent
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -14,6 +14,7 @@ def evaluate_answer(challenge: Challenge, answer: dict) -> tuple[bool, str]:
     ctype = challenge.type.value
     content = challenge.content
 
+
     if ctype == "steps":
         expected = content.get("expected_keywords", [])
         student_steps = answer.get("steps", [])
@@ -22,7 +23,14 @@ def evaluate_answer(challenge: Challenge, answer: dict) -> tuple[bool, str]:
             if i < len(student_steps):
                 if any(kw.lower() in student_steps[i].lower() for kw in keywords):
                     correct_count += 1
-        is_correct = correct_count >= len(expected) * 0.6
+        threshold = 0.7 if challenge.difficulty == 4 else 0.6
+        is_correct = correct_count >= len(expected) * threshold     
+        return is_correct, ""
+
+    elif ctype in ("ordering", "algorithm", "abstraction"):
+        correct_order = content.get("correct_order", [])
+        given_order = answer.get("order", [])
+        is_correct = correct_order == given_order
         return is_correct, ""
 
     elif ctype == "pattern":
@@ -33,6 +41,12 @@ def evaluate_answer(challenge: Challenge, answer: dict) -> tuple[bool, str]:
 
     return False, ""
 
+@router.get("/me", response_model=list[SubmissionResponse])
+def get_my_submissions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(Submission).filter(Submission.user_id == current_user.id).all()
 
 @router.post("/", response_model=SubmissionResponse, status_code=201)
 async def submit(
@@ -70,8 +84,10 @@ async def submit(
     elif is_correct:
         xp_earned = XP_TABLE.get(challenge.difficulty, 10) // 2
         grant_xp(db, current_user, xp_earned, f"challenge_{challenge.id}_retry")
-
+    
+    update_streak(db, current_user)
     check_badges(db, current_user)
+    db.add(current_user)
 
     submission = Submission(
         user_id=current_user.id,

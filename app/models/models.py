@@ -18,6 +18,8 @@ class ChallengeType(str, enum.Enum):
     steps = "steps"
     pattern = "pattern"
     algorithm = "algorithm"
+    ordering = "ordering"
+    abstraction = "abstraction"
 
 
 class ChallengeCategory(str, enum.Enum):
