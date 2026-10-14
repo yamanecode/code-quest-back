@@ -1,9 +1,9 @@
 import httpx
+
 from app.core.config import settings
 
 GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.5-flash:generateContent"
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 )
 
 
@@ -16,7 +16,9 @@ async def _call_gemini(prompt: str) -> str:
         return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
-async def feedback_agent(challenge_title: str, challenge_description: str, answer: dict, is_correct: bool) -> str:
+async def feedback_agent(
+    challenge_title: str, challenge_description: str, answer: dict, is_correct: bool
+) -> str:
     correct_str = "correta" if is_correct else "incorreta"
     prompt = f"""Você é um tutor de Pensamento Computacional. Responda em português, de forma curta e pedagógica (máximo 4 frases).
 
@@ -29,7 +31,9 @@ Explique o que o estudante acertou ou errou e por quê. Não dê a resposta dire
     return await _call_gemini(prompt)
 
 
-async def tutor_agent(challenge_title: str, challenge_description: str, current_answer: dict) -> str:
+async def tutor_agent(
+    challenge_title: str, challenge_description: str, current_answer: dict
+) -> str:
     prompt = f"""Você é um tutor socrático de Pensamento Computacional. Responda em português, com no máximo 3 frases.
 
 Desafio: {challenge_title}
@@ -64,6 +68,7 @@ Para 'steps': content={{"steps":[{{"label":"..."}}],"expected_keywords":[["palav
 Para 'pattern': content={{"sequence":"...","answer":"...","explanation":"..."}}
 """
     return await _call_gemini(prompt)
+
 
 async def generate_daily_challenge() -> str:
     prompt = """Você é um especialista em Pensamento Computacional criando um desafio educacional avançado para estudantes de computação. Sua tarefa é criar UM desafio mestre que integre os 4 pilares do Pensamento Computacional em um problema único e coeso.

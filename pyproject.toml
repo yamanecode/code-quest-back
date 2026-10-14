@@ -1,75 +1,117 @@
 [project]
 name = "code-quest-back"
 version = "0.1.0"
-description = "Add your description here"
+description = "CodeQuest backend: gamified Computational Thinking platform"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "alembic==1.18.4",
-    "annotated-doc==0.0.4",
-    "annotated-types==0.7.0",
-    "anyio==4.13.0",
+    "alembic>=1.18.4",
     "bcrypt==4.0.1",
-    "certifi==2026.4.22",
-    "charset-normalizer==3.4.7",
-    "click==8.3.3",
-    "colorama==0.4.6",
-    "distro==1.9.0",
-    "dnspython==2.8.0",
-    "ecdsa==0.19.2",
-    "email-validator==2.3.0",
-    "fastapi==0.136.1",
-    "greenlet==3.5.0",
-    "h11==0.16.0",
-    "httpcore==1.0.9",
-    "httpx==0.28.1",
-    "idna==3.13",
-    "jiter==0.14.0",
-    "jsonpatch==1.33",
-    "jsonpointer==3.1.1",
-    "langchain==1.2.16",
-    "langchain-core==1.3.2",
-    "langchain-openai==1.2.1",
-    "langchain-protocol==0.0.14",
-    "langgraph==1.1.10",
-    "langgraph-checkpoint==4.0.3",
-    "langgraph-prebuilt==1.0.13",
-    "langgraph-sdk==0.3.13",
-    "langsmith==0.7.38",
-    "mako==1.3.12",
-    "markupsafe==3.0.3",
-    "numpy==2.4.4",
-    "openai==2.33.0",
-    "orjson==3.11.8",
-    "ormsgpack==1.12.2",
-    "packaging==26.2",
-    "passlib==1.7.4",
-    "pgvector==0.4.2",
-    "psycopg2-binary==2.9.12",
-    "pyasn1==0.6.3",
-    "pydantic==2.13.3",
-    "pydantic-core==2.46.3",
-    "pydantic-settings==2.14.0",
-    "python-dotenv==1.2.2",
-    "python-jose==3.5.0",
-    "pyyaml==6.0.3",
-    "regex==2026.4.4",
-    "requests==2.33.1",
-    "requests-toolbelt==1.0.0",
-    "rsa==4.9.1",
-    "six==1.17.0",
-    "sniffio==1.3.1",
-    "sqlalchemy==2.0.49",
-    "starlette==1.0.0",
-    "tenacity==9.1.4",
-    "tiktoken==0.12.0",
-    "tqdm==4.67.3",
-    "typing-extensions==4.15.0",
-    "typing-inspection==0.4.2",
-    "urllib3==2.6.3",
-    "uuid-utils==0.14.1",
-    "uv==0.11.8",
-    "uvicorn==0.46.0",
-    "xxhash==3.7.0",
-    "zstandard==0.25.0",
+    "email-validator>=2.3.0",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "langgraph>=1.1.10",
+    "numpy>=2.4.4",
+    "passlib>=1.7.4",
+    "pgvector>=0.4.2",
+    "psycopg2-binary>=2.9.12",
+    "pydantic>=2.13.3",
+    "pydantic-settings>=2.14.0",
+    "python-jose>=3.5.0",
+    "redis>=8.1.0",
+    "slowapi>=0.1.10",
+    "sqlalchemy>=2.0.49",
+    "tzdata>=2026.5",
+    "uvicorn[standard]>=0.46.0",
 ]
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.15",
+    "pip-audit>=2.10.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+# UP042: TCC1 str-Enums are kept as is (no behavior change in phase 00).
+ignore = ["UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+# Long prompt/data literals in TCC1 code; both files are replaced in later phases.
+"seed.py" = ["E501"]
+"app/ai/ai_service.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "req(id): requirement ID proven by this test",
+    "live: calls a real external provider; skipped by default",
+    "legacy: characterization test of TCC1 behavior",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: api > services > repositories > models"
+type = "layers"
+layers = ["app.api", "app.services", "app.repositories", "app.models"]
+
+[[tool.importlinter.contracts]]
+name = "api must not import repositories, models, ai, sqlalchemy"
+type = "forbidden"
+source_modules = ["app.api"]
+forbidden_modules = ["app.repositories", "app.models", "app.ai", "sqlalchemy"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "services must not import fastapi, starlette, sqlalchemy"
+type = "forbidden"
+source_modules = ["app.services"]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "domain is pure"
+type = "forbidden"
+source_modules = ["app.domain"]
+forbidden_modules = [
+    "sqlalchemy", "fastapi", "app.models", "app.repositories",
+    "app.services", "app.ai", "app.api",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "ai is isolated"
+type = "forbidden"
+source_modules = ["app.ai"]
+forbidden_modules = ["app.api", "app.services", "app.repositories", "app.models"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "core imports no upper layer"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.api", "app.services", "app.repositories", "app.models"]
+allow_indirect_imports = true
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]

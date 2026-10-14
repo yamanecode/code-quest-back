@@ -1,6 +1,8 @@
 from datetime import date
+
 from sqlalchemy.orm import Session
-from app.models.models import User, XPEvent, Badge, UserBadge
+
+from app.models.models import Badge, User, UserBadge, XPEvent
 
 XP_TABLE = {1: 10, 2: 20, 3: 35, 4: 50, 5: 75}
 STREAK_BONUS = 5
@@ -11,10 +13,14 @@ def calc_level(xp: int) -> int:
 
 
 def grant_xp(db: Session, user: User, amount: int, reason: str):
-    exists = db.query(XPEvent).filter(
-        XPEvent.user_id == user.id,
-        XPEvent.reason == reason,
-    ).first()
+    exists = (
+        db.query(XPEvent)
+        .filter(
+            XPEvent.user_id == user.id,
+            XPEvent.reason == reason,
+        )
+        .first()
+    )
     if exists:
         return
     user.xp += amount
@@ -50,7 +56,9 @@ def update_streak(db: Session, user: User):
 
 def check_badges(db: Session, user: User):
     all_badges = db.query(Badge).all()
-    earned_ids = {ub.badge_id for ub in db.query(UserBadge).filter(UserBadge.user_id == user.id).all()}
+    earned_ids = {
+        ub.badge_id for ub in db.query(UserBadge).filter(UserBadge.user_id == user.id).all()
+    }
     for badge in all_badges:
         if badge.id in earned_ids:
             continue

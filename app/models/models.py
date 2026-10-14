@@ -1,10 +1,8 @@
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey,
-    Enum, Text, func
-)
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship, declarative_base
 import enum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 

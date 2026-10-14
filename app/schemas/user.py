@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
 from enum import Enum
+
+from pydantic import BaseModel, EmailStr
 
 
 class UserRole(str, Enum):
@@ -21,7 +22,7 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105 - OAuth2 token type label, not a secret
 
 
 class UserResponse(BaseModel):

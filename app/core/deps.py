@@ -1,10 +1,11 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
+from sqlalchemy.orm import Session
+
+from app.core.security import decode_token
 from app.database import get_db
 from app.models.models import User
-from app.core.security import decode_token
 
 bearer = HTTPBearer()
 
@@ -18,7 +19,7 @@ def get_current_user(
         payload = decode_token(token)
         user_id = int(payload["sub"])
     except (JWTError, KeyError, ValueError):
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from None
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

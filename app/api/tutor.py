@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
+import json
 from typing import Any
-from app.database import get_db
-from app.models.models import User, Challenge
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.ai.ai_service import generate_challenge, generate_daily_challenge, tutor_agent
 from app.core.deps import get_current_user, require_professor
-from app.ai.ai_service import tutor_agent, generate_challenge, generate_daily_challenge
+from app.database import get_db
+from app.models.models import Challenge, ChallengeCategory, ChallengeType, User
 
 router = APIRouter(prefix="/tutor", tags=["tutor"])
 
@@ -55,8 +58,6 @@ async def generate(
     result = await generate_challenge(body.topic, body.type, body.difficulty)
     return {"raw": result}
 
-import json
-from app.models.models import Challenge, ChallengeType, ChallengeCategory
 
 @router.post("/generate-daily")
 async def generate_daily(
@@ -64,18 +65,20 @@ async def generate_daily(
     current_user: User = Depends(get_current_user),
 ):
     raw = await generate_daily_challenge()
-    
+
     # Strip markdown fences if Gemini wraps it
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    
+
     try:
         data = json.loads(clean)
     except Exception:
-        raise HTTPException(status_code=500, detail=f"AI returned invalid JSON: {raw[:200]}")
-    
+        raise HTTPException(
+            status_code=500, detail=f"AI returned invalid JSON: {raw[:200]}"
+        ) from None
+
     # Replace current daily
-    db.query(Challenge).filter(Challenge.is_daily == True).update({"is_daily": False})
-    
+    db.query(Challenge).filter(Challenge.is_daily.is_(True)).update({"is_daily": False})
+
     challenge = Challenge(
         title=data["title"],
         description=data["description"],
