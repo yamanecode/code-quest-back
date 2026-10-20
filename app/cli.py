@@ -1,7 +1,6 @@
 """Administration commands: uv run python -m app.cli <command>."""
 
 import argparse
-import os
 import sys
 from getpass import getpass
 from pathlib import Path
@@ -9,6 +8,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.clock import SystemClock
+from app.core.config import get_settings
 from app.infra.db.session import get_sessionmaker
 from app.services.auth_service import AuthService
 from app.services.base_content_service import BaseContentService
@@ -21,7 +21,7 @@ def open_session() -> Session:
 
 
 def _read_password() -> str | None:
-    password = os.environ.get("CODEQUEST_PROFESSOR_PASSWORD")
+    password = get_settings().CODEQUEST_PROFESSOR_PASSWORD
     if password:
         return password
     password = getpass("Senha do professor: ")

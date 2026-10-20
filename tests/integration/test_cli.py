@@ -1,15 +1,26 @@
 import shutil
 from pathlib import Path
 
+import pytest
 from sqlalchemy import func, select
 
 from app import cli
+from app.core.config import get_settings
 from app.domain.enums import Role
 from app.infra.db.models import Mission, User
 from app.infra.security import verify_password
 
 PASSWORD = "senha-do-professor"
 BASE_DIR = Path(__file__).resolve().parents[2] / "content" / "base"
+
+
+@pytest.fixture(autouse=True)
+def fresh_settings(monkeypatch, tmp_path):
+    """Settings are cached and read .env from the working directory; each test sets its own."""
+    monkeypatch.chdir(tmp_path)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def test_T_CLI_01_create_professor_with_password_from_env(session, monkeypatch, capsys):
@@ -122,3 +133,22 @@ class _NullSession:
 
     def __exit__(self, *args):
         return False
+
+
+def test_T_CLI_04_password_is_read_from_the_env_file_without_prompting(
+    session, monkeypatch, tmp_path
+):
+    monkeypatch.delenv("CODEQUEST_PROFESSOR_PASSWORD", raising=False)
+    env_line = f"CODEQUEST_PROFESSOR_PASSWORD={PASSWORD}\n"
+    # The autouse fixture already made tmp_path the working directory.
+    (tmp_path / ".env").write_text(env_line, encoding="utf-8")
+
+    def no_prompt(prompt):
+        raise AssertionError("the password in .env must be used")
+
+    monkeypatch.setattr(cli, "getpass", no_prompt)
+
+    assert cli.create_professor(session, "prof_arquivo") == 0
+
+    user = session.scalar(select(User).filter_by(username="prof_arquivo"))
+    assert verify_password(PASSWORD, user.password_hash)
