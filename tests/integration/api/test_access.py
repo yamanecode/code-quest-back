@@ -6,6 +6,7 @@ from app.domain.enums import Role
 from app.infra.security import create_token
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
+    CORRECT_ANSWER,
     make_challenge,
     make_classroom,
     make_mission,
@@ -152,3 +153,39 @@ def test_T_ACL_04_other_professors_challenge_is_404(client, session, intruder, o
         ],
     )
     assert client.get("/api/professor/challenges", headers=intruder).json() == []
+
+
+def test_T_ACL_05_non_member_gets_404_on_a_turma_mission(client, session, clock):
+    outsider = make_user(session, role=Role.STUDENT)
+    mission = make_mission(session, make_classroom(session))
+    challenge = make_challenge(session, missions=(mission,))
+    headers = bearer(outsider, clock)
+
+    assert client.get(f"/api/missions/{mission.id}", headers=headers).status_code == 404
+    assert client.get(f"/api/challenges/{challenge.id}", headers=headers).status_code == 404
+    submission = client.post(
+        f"/api/challenges/{challenge.id}/submissions",
+        json={"answer": CORRECT_ANSWER[challenge.type]},
+        headers=headers,
+    )
+    assert submission.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("get", "/api/me"),
+        ("put", "/api/me/settings"),
+        ("get", "/api/missions"),
+        ("get", "/api/missions/1"),
+        ("get", "/api/challenges/1"),
+        ("post", "/api/challenges/1/submissions"),
+        ("get", "/api/daily-challenge"),
+    ],
+)
+def test_T_ACL_06_professor_gets_403_on_student_play_routes(client, session, clock, method, path):
+    teacher = make_user(session, role=Role.PROFESSOR)
+
+    response = client.request(method, path, headers=bearer(teacher, clock))
+
+    assert response.status_code == 403

@@ -12,6 +12,7 @@ from app.domain.gamification import (
     goal_target,
     level_for,
     local_date,
+    mission_completed,
     month_start,
     streak,
     title_for,
@@ -194,3 +195,12 @@ def test_T_DOM_GOAL_03_target_is_capped_at_the_open_first_solves():
 def test_T_DOM_GOAL_04_no_goal_when_nothing_is_available():
     assert goal_target(None, member_count=5, available=0) is None
     assert goal_target(10, member_count=5, available=0) is None
+
+
+def test_T_DOM_MISSION_01_completed_only_when_every_challenge_is_solved():
+    assert mission_completed([1, 2, 3], solved_ids={1, 2, 3, 9})
+    assert not mission_completed([1, 2, 3], solved_ids={1, 3})
+
+
+def test_T_DOM_MISSION_02_mission_without_challenges_is_never_completed():
+    assert not mission_completed([], solved_ids={1, 2})

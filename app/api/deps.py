@@ -13,6 +13,8 @@ from app.services.auth_service import Account, AuthService
 from app.services.classroom_service import ClassroomService
 from app.services.content_service import ContentService
 from app.services.exceptions import Forbidden, Unauthorized
+from app.services.gamification_service import GamificationService
+from app.services.play_service import PlayService
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -35,6 +37,20 @@ def get_classroom_service(session: DbSession) -> ClassroomService:
 
 def get_content_service(session: DbSession) -> ContentService:
     return ContentService(session)
+
+
+def get_gamification_service(
+    session: DbSession, clock: Annotated[Clock, Depends(get_clock)]
+) -> GamificationService:
+    return GamificationService(session, clock)
+
+
+def get_play_service(
+    session: DbSession,
+    clock: Annotated[Clock, Depends(get_clock)],
+    gamification: Annotated[GamificationService, Depends(get_gamification_service)],
+) -> PlayService:
+    return PlayService(session, clock, gamification)
 
 
 def get_current_user(
@@ -63,3 +79,5 @@ CurrentProfessor = Annotated[Account, Depends(require_professor)]
 Auth = Annotated[AuthService, Depends(get_auth_service)]
 Classrooms = Annotated[ClassroomService, Depends(get_classroom_service)]
 Content = Annotated[ContentService, Depends(get_content_service)]
+Gamification = Annotated[GamificationService, Depends(get_gamification_service)]
+Play = Annotated[PlayService, Depends(get_play_service)]

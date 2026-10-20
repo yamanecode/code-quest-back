@@ -66,6 +66,21 @@ CONTENT = {
 }
 
 
+CORRECT_ANSWER = {
+    ChallengeType.ORDERING: {"order": ["a", "b", "c"]},
+    ChallengeType.GROUPING: {"assignment": {"a": "g1", "b": "g2", "c": "g1", "d": "g2"}},
+    ChallengeType.FILTERING: {"selected": ["a"]},
+    ChallengeType.PATTERN: {"option": "a"},
+}
+
+WRONG_ANSWER = {
+    ChallengeType.ORDERING: {"order": ["c", "b", "a"]},
+    ChallengeType.GROUPING: {"assignment": {"a": "g1", "b": "g1", "c": "g1", "d": "g1"}},
+    ChallengeType.FILTERING: {"selected": ["b"]},
+    ChallengeType.PATTERN: {"option": "b"},
+}
+
+
 def _add(session: Session, row):
     session.add(row)
     session.flush()
@@ -118,6 +133,7 @@ def make_challenge(
     challenge_type: ChallengeType = ChallengeType.ORDERING,
     status: ContentStatus = ContentStatus.PUBLISHED,
     missions: tuple[Mission, ...] = (),
+    explanation: str | None = None,
 ) -> Challenge:
     author = owner or make_user(session, role=Role.PROFESSOR)
     challenge = _add(
@@ -128,6 +144,7 @@ def make_challenge(
             statement="Enunciado de teste com tamanho suficiente.",
             type=challenge_type,
             content=CONTENT[challenge_type],
+            explanation=explanation,
             status=status,
             origin=Origin.PROFESSOR,
         ),

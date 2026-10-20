@@ -61,6 +61,12 @@ def streak(days_with_solve: set[date], today: date) -> int:
     return count
 
 
+def mission_completed(challenge_ids: Iterable[int], solved_ids: set[int]) -> bool:
+    """A mission counts as completed when it has challenges and all of them are solved."""
+    ids = set(challenge_ids)
+    return bool(ids) and ids <= solved_ids
+
+
 def week_start(moment: datetime) -> datetime:
     local = _to_local(moment)
     monday = local.date() - timedelta(days=local.weekday())

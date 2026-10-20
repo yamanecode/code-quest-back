@@ -37,6 +37,8 @@ class BadgeStats:
     types_first_solved_today: frozenset[str] = frozenset()
 
 
+HIDDEN_BADGE_NAME = "Insígnia secreta"
+
 Condition = Callable[[BadgeStats], bool]
 
 SKILL_BADGES = (
@@ -214,3 +216,10 @@ _CONDITIONS: dict[str, Condition] = {badge.code: condition for badge, condition 
 def badge_codes_earned(stats: BadgeStats) -> set[str]:
     """Every badge whose condition holds; the caller removes the ones already awarded."""
     return {code for code, condition in _CONDITIONS.items() if condition(stats)}
+
+
+def badge_display(badge: Badge, earned: bool) -> tuple[str, str]:
+    """Name and description a student sees; hidden badges keep their condition secret."""
+    if badge.hidden and not earned:
+        return HIDDEN_BADGE_NAME, ""
+    return badge.name, badge.description

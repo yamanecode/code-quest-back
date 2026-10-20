@@ -37,3 +37,13 @@ def test_T_REPO_26_shown_texts_in_order_from_every_source(session):
     hint(session, make_user(session), challenge, text="de outra pessoa")
 
     assert HintRepository(session).shown_texts(ana.id, challenge.id) == ["primeira", "segunda"]
+
+
+def test_T_REPO_38_challenges_with_requested_hints(session):
+    ana = make_user(session)
+    asked, automatic, untouched = (make_challenge(session) for _ in range(3))
+    hint(session, ana, asked, HintSource.REQUEST)
+    hint(session, ana, automatic, HintSource.AFTER_WRONG)
+    hint(session, make_user(session), untouched, HintSource.REQUEST)
+
+    assert HintRepository(session).requested_challenge_ids(ana.id) == {asked.id}

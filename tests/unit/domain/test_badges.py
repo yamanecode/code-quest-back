@@ -1,4 +1,11 @@
-from app.domain.badges import BADGES, BadgeStats, Tier, badge_codes_earned
+from app.domain.badges import (
+    BADGES,
+    HIDDEN_BADGE_NAME,
+    BadgeStats,
+    Tier,
+    badge_codes_earned,
+    badge_display,
+)
 
 ALL_TYPES = frozenset({"ordering", "grouping", "filtering", "pattern"})
 
@@ -228,3 +235,13 @@ def test_T_DOM_BADGE_30_no_hint_mission():
         BadgeStats(missions_completed=3, missions_completed_without_hints=0),
         BadgeStats(missions_completed=1, missions_completed_without_hints=1),
     )
+
+
+def test_T_DOM_BADGE_31_hidden_badge_is_secret_until_earned():
+    by_code = {badge.code: badge for badge in BADGES}
+    hidden, visible = by_code["all_types_day"], by_code["first_solve"]
+
+    assert HIDDEN_BADGE_NAME == "Insígnia secreta"
+    assert badge_display(hidden, earned=False) == (HIDDEN_BADGE_NAME, "")
+    assert badge_display(hidden, earned=True) == (hidden.name, hidden.description)
+    assert badge_display(visible, earned=False) == (visible.name, visible.description)

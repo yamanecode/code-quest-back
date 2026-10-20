@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 from sqlalchemy import delete, exists, or_, select
 from sqlalchemy.orm import Session
 
@@ -69,6 +71,34 @@ class MissionRepository:
         )
         return list(self.session.scalars(query))
 
+    def _published_links(self):
+        return (
+            select(MissionChallenge.mission_id, MissionChallenge.challenge_id)
+            .join(Challenge, Challenge.id == MissionChallenge.challenge_id)
+            .where(Challenge.status == PUBLISHED)
+            .order_by(MissionChallenge.position, MissionChallenge.id)
+        )
+
+    def published_challenge_ids_by_mission(
+        self, mission_ids: Iterable[int]
+    ) -> dict[int, list[int]]:
+        """Published challenge ids of each mission, in mission order (empty list when none)."""
+        ids = list(mission_ids)
+        by_mission: dict[int, list[int]] = {mission_id: [] for mission_id in ids}
+        query = self._published_links().where(MissionChallenge.mission_id.in_(ids))
+        for mission_id, challenge_id in self.session.execute(query):
+            by_mission[mission_id].append(challenge_id)
+        return by_mission
+
+    def published_challenges(self, mission_id: int) -> list[Challenge]:
+        query = (
+            select(Challenge)
+            .join(MissionChallenge, MissionChallenge.challenge_id == Challenge.id)
+            .where(MissionChallenge.mission_id == mission_id, Challenge.status == PUBLISHED)
+            .order_by(MissionChallenge.position, MissionChallenge.id)
+        )
+        return list(self.session.scalars(query))
+
     def has_published_challenge(self, mission_id: int) -> bool:
         condition = (
             exists()
@@ -97,6 +127,10 @@ class MissionRepository:
     def visible_mission_ids(self, user_id: int) -> set[int]:
         """Published base missions plus published missions of the student's turmas."""
         return set(self.session.scalars(self._visible_missions(user_id)))
+
+    def visible_missions(self, user_id: int) -> list[Mission]:
+        query = select(Mission).where(Mission.id.in_(self._visible_missions(user_id)))
+        return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
 
     def visible_published_challenge_ids(self, user_id: int) -> set[int]:
         query = (

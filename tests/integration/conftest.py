@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_clock
 from app.core.clock import FixedClock
 from app.core.config import get_settings
+from app.domain.badges import BADGES
 from app.infra.db.models import Base
 from app.infra.db.session import get_session
+from app.infra.repositories.badges import BadgeRepository
 from app.main import create_app
 from tests.integration.factories import NOON
 
@@ -39,6 +41,12 @@ def session(engine: Engine) -> Iterator[Session]:
         connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
     with Session(engine) as db_session:
         yield db_session
+
+
+@pytest.fixture
+def badge_catalog(session: Session) -> None:
+    """The 30 badge rows; the seed and base-game commands create them outside tests."""
+    BadgeRepository(session).sync(BADGES)
 
 
 @pytest.fixture
