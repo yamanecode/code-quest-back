@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Response
 
 from app.api.deps import Classrooms, CurrentStudent, Gamification, Play, require_student
 from app.api.schemas.classrooms import ClassroomRefOut, JoinRequest, MyClassroomOut
+from app.api.schemas.gamification import RankingOut, RankingPeriodIn, RankingScopeIn
 from app.api.schemas.play import (
     ChallengeForStudentOut,
     DailyOut,
@@ -21,10 +22,7 @@ router = APIRouter(tags=["student"], dependencies=[Depends(require_student)])
 
 @router.get("/classrooms")
 def my_classrooms(student: CurrentStudent, classrooms: Classrooms) -> list[MyClassroomOut]:
-    return [
-        MyClassroomOut(id=item.id, name=item.name, goal=item.goal)
-        for item in classrooms.my_classrooms(student.id)
-    ]
+    return [MyClassroomOut(**asdict(item)) for item in classrooms.my_classrooms(student.id)]
 
 
 @router.post("/classrooms/join")
@@ -79,3 +77,15 @@ def submit_answer(
 @router.get("/daily-challenge")
 def daily_challenge(student: CurrentStudent, play: Play) -> DailyOut:
     return DailyOut(**asdict(play.daily_challenge(student.id)))
+
+
+@router.get("/rankings")
+def ranking(
+    student: CurrentStudent,
+    gamification: Gamification,
+    scope: RankingScopeIn = "global",
+    period: RankingPeriodIn = "week",
+    classroom_id: int | None = None,
+) -> RankingOut:
+    result = gamification.ranking(student.id, scope, period, classroom_id)
+    return RankingOut(**asdict(result))

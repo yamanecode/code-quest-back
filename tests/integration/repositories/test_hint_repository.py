@@ -47,3 +47,18 @@ def test_T_REPO_38_challenges_with_requested_hints(session):
     hint(session, make_user(session), untouched, HintSource.REQUEST)
 
     assert HintRepository(session).requested_challenge_ids(ana.id) == {asked.id}
+
+
+def test_T_REPO_40_requested_hint_count_on_some_challenges(session):
+    ana = make_user(session)
+    first, second, elsewhere = (make_challenge(session) for _ in range(3))
+    hint(session, ana, first, HintSource.REQUEST)
+    hint(session, ana, first, HintSource.REQUEST)
+    hint(session, ana, second, HintSource.REQUEST)
+    hint(session, ana, second, HintSource.AFTER_WRONG)
+    hint(session, ana, elsewhere, HintSource.REQUEST)
+    hint(session, make_user(session), first, HintSource.REQUEST)
+
+    repo = HintRepository(session)
+    assert repo.requested_count(ana.id, [first.id, second.id]) == 3
+    assert repo.requested_count(ana.id, []) == 0

@@ -105,3 +105,20 @@ def test_T_REPO_25_first_solves_by_type(session):
         first_solve(session, ana, make_challenge(session, challenge_type=challenge_type))
 
     assert XPRepository(session).first_solves_by_type(ana.id) == {"ordering": 2, "pattern": 1}
+
+
+def test_T_REPO_39_xp_in_classroom_total_counts_every_week(session):
+    turma = make_classroom(session)
+    ana, bia = make_user(session, "ana"), make_user(session, "bia")
+    add_member(session, ana, turma)
+    add_member(session, bia, turma)
+    mission = make_mission(session, turma)
+    this_week, last_month = (make_challenge(session, missions=(mission,)) for _ in range(2))
+    base = make_challenge(session, missions=(make_mission(session),))
+
+    first_solve(session, ana, this_week, amount=10, at=MONDAY)
+    first_solve(session, ana, last_month, amount=5, at=MONDAY - timedelta(days=40))
+    first_solve(session, ana, base, amount=10, at=MONDAY)
+
+    rows = XPRepository(session).xp_in_classroom_total(turma.id)
+    assert _pairs(rows) == [("ana", 15), ("bia", 0)]

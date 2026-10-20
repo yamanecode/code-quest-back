@@ -4,7 +4,7 @@ import pytest
 
 from app.domain.badges import BADGES
 from app.domain.challenge_types import ChallengeType
-from app.domain.enums import HintSource
+from app.domain.enums import HintSource, Role
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     CORRECT_ANSWER,
@@ -193,3 +193,64 @@ def test_T_STU_PUBLIC_01_settings_reject_other_fields(client, headers):
 
     assert response.status_code == 422
     assert me(client, headers)["username"] == "aluna"
+
+
+def player(client, headers, username):
+    return client.get(f"/api/players/{username}", headers=headers)
+
+
+def test_T_STU_PUBLIC_02_private_profile_is_404(client, session, headers, clock):
+    other = make_user(session, "colega")
+    make_user(session, "prof", role=Role.PROFESSOR, public=True)  # public, but not a student
+
+    for username in ("colega", "prof", "ninguem"):
+        response = player(client, headers, username)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "player_not_found"
+    assert player(client, bearer(other, clock), "aluna").status_code == 404  # default is off
+
+
+def test_T_STU_PUBLIC_03_public_profile_has_exactly_the_public_fields(
+    client, session, headers, clock
+):
+    mission = make_mission(session)
+    for challenge_type in ChallengeType:
+        solve(
+            client,
+            headers,
+            make_challenge(session, challenge_type=challenge_type, missions=(mission,)),
+        )
+    client.put("/api/me/settings", json={"profile_public": True}, headers=headers)
+    colleague = bearer(make_user(session, "colega"), clock)
+
+    body = player(client, colleague, "Aluna").json()
+
+    assert body == {
+        "username": "aluna",
+        "level": 1,
+        "title": "Aprendiz",
+        "badges": [
+            {"code": "first_solve", "name": "Primeiro desafio", "tier": "bronze", "emoji": "⭐"},
+            {"code": "mission_1", "name": "Primeira missão", "tier": "bronze", "emoji": "🚩"},
+            {
+                "code": "all_types_day",
+                "name": "Pensamento completo",
+                "tier": "silver",
+                "emoji": "🌈",
+            },
+            {
+                "code": "no_hint_mission",
+                "name": "Por conta própria",
+                "tier": "silver",
+                "emoji": "🦉",
+            },
+        ],
+    }
+
+
+def test_T_STU_PUBLIC_03_any_logged_in_user_can_open_it(client, session, headers, clock):
+    client.put("/api/me/settings", json={"profile_public": True}, headers=headers)
+    professor = make_user(session, "prof", role=Role.PROFESSOR)
+
+    assert player(client, bearer(professor, clock), "aluna").status_code == 200
+    assert client.get("/api/players/aluna").status_code == 401

@@ -6,14 +6,19 @@ import pytest
 from app.domain.gamification import (
     TIMEZONE,
     RankedRow,
+    RankingPeriod,
     RankRow,
+    completed_every_mission,
+    completion_pct,
     daily_pick,
     dense_rank,
+    goal_reached,
     goal_target,
     level_for,
     local_date,
     mission_completed,
     month_start,
+    period_start,
     streak,
     title_for,
     week_start,
@@ -204,3 +209,38 @@ def test_T_DOM_MISSION_01_completed_only_when_every_challenge_is_solved():
 
 def test_T_DOM_MISSION_02_mission_without_challenges_is_never_completed():
     assert not mission_completed([], solved_ids={1, 2})
+
+
+def test_T_DOM_RANK_06_period_start_by_ranking_period():
+    now = datetime(2026, 10, 21, 15, 0, tzinfo=TIMEZONE)
+    assert period_start(RankingPeriod.WEEK, now) == week_start(now)
+    assert period_start(RankingPeriod.MONTH, now) == month_start(now)
+    assert period_start("month", now) == datetime(2026, 10, 1, tzinfo=TIMEZONE)
+
+
+def test_T_DOM_GOAL_05_goal_is_reached_when_progress_meets_the_target():
+    assert not goal_reached(progress=9, target=10)
+    assert goal_reached(progress=10, target=10)
+    assert goal_reached(progress=12, target=10)
+
+
+def test_T_DOM_PROGRESS_01_completion_pct_is_a_rounded_integer():
+    assert completion_pct(1, 3) == 33
+    assert completion_pct(2, 3) == 67
+    assert completion_pct(3, 3) == 100
+    assert completion_pct(1, 8) == 13  # 12.5 rounds up, not to the even 12
+    assert completion_pct(0, 4) == 0
+
+
+def test_T_DOM_PROGRESS_02_completion_pct_of_nobody_is_zero():
+    assert completion_pct(0, 0) == 0
+
+
+def test_T_DOM_MISSION_03_completed_every_mission():
+    missions = [[1, 2], [3]]
+    assert completed_every_mission(missions, solved_ids={1, 2, 3})
+    assert not completed_every_mission(missions, solved_ids={1, 2})
+
+
+def test_T_DOM_MISSION_04_no_missions_means_nothing_to_complete():
+    assert not completed_every_mission([], solved_ids={1})

@@ -31,12 +31,10 @@ def get_auth_service(
     return AuthService(session, clock)
 
 
-def get_classroom_service(session: DbSession) -> ClassroomService:
-    return ClassroomService(session)
-
-
-def get_content_service(session: DbSession) -> ContentService:
-    return ContentService(session)
+def get_content_service(
+    session: DbSession, clock: Annotated[Clock, Depends(get_clock)]
+) -> ContentService:
+    return ContentService(session, clock)
 
 
 def get_gamification_service(
@@ -45,12 +43,21 @@ def get_gamification_service(
     return GamificationService(session, clock)
 
 
+def get_classroom_service(
+    session: DbSession,
+    clock: Annotated[Clock, Depends(get_clock)],
+    gamification: Annotated[GamificationService, Depends(get_gamification_service)],
+) -> ClassroomService:
+    return ClassroomService(session, clock, gamification)
+
+
 def get_play_service(
     session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
     gamification: Annotated[GamificationService, Depends(get_gamification_service)],
+    goals: Annotated[ClassroomService, Depends(get_classroom_service)],
 ) -> PlayService:
-    return PlayService(session, clock, gamification)
+    return PlayService(session, clock, gamification, goals)
 
 
 def get_current_user(

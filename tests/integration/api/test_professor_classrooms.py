@@ -56,11 +56,11 @@ def test_T_PROF_01_list_shows_only_own_classrooms(client, session, headers):
     assert [item["name"] for item in listed] == ["Minha"]
 
 
-def test_T_PROF_02_join_code_collision_is_retried(client, session, headers):
+def test_T_PROF_02_join_code_collision_is_retried(client, session, clock, headers):
     taken = make_classroom(session)
     codes = iter([taken.join_code, "NEW001"])
     client.app.dependency_overrides[get_content_service] = lambda: ContentService(
-        session, make_join_code=lambda: next(codes)
+        session, clock, make_join_code=lambda: next(codes)
     )
 
     response = client.post(URL, json={"name": "Turma"}, headers=headers)
@@ -69,9 +69,9 @@ def test_T_PROF_02_join_code_collision_is_retried(client, session, headers):
     assert response.json()["join_code"] == "NEW001"
 
 
-def test_T_PROF_02_gives_up_after_repeated_collisions(session, teacher):
+def test_T_PROF_02_gives_up_after_repeated_collisions(session, clock, teacher):
     taken = make_classroom(session)
-    service = ContentService(session, make_join_code=lambda: taken.join_code)
+    service = ContentService(session, clock, make_join_code=lambda: taken.join_code)
 
     with pytest.raises(RuntimeError):
         service.create_classroom(teacher.id, "Turma", None)

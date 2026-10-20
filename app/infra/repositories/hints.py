@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -58,6 +59,14 @@ class HintRepository:
             HintEvent.user_id == user_id, HintEvent.source == HintSource.REQUEST
         )
         return set(self.session.scalars(query))
+
+    def requested_count(self, user_id: int, challenge_ids: Iterable[int]) -> int:
+        query = select(func.count()).where(
+            HintEvent.user_id == user_id,
+            HintEvent.challenge_id.in_(list(challenge_ids)),
+            HintEvent.source == HintSource.REQUEST,
+        )
+        return self.session.scalar(query) or 0
 
     def after_wrong_hint_exists(self, user_id: int, challenge_id: int) -> bool:
         condition = exists().where(

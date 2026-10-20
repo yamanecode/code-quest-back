@@ -12,6 +12,7 @@ from app.infra.db.models import (
     ClassroomMember,
     Mission,
     MissionChallenge,
+    User,
     XPEvent,
 )
 
@@ -69,6 +70,15 @@ class ClassroomRepository:
         )
         return list(self.session.scalars(query))
 
+    def members(self, classroom_id: int) -> list[User]:
+        query = (
+            select(User)
+            .join(ClassroomMember, ClassroomMember.user_id == User.id)
+            .where(ClassroomMember.classroom_id == classroom_id)
+            .order_by(User.username)
+        )
+        return list(self.session.scalars(query))
+
     def member_count(self, classroom_id: int) -> int:
         query = select(func.count()).where(ClassroomMember.classroom_id == classroom_id)
         return self.session.scalar(query) or 0
@@ -96,6 +106,29 @@ class ClassroomRepository:
             XPEvent.user_id.in_(self._members(classroom_id)),
             XPEvent.challenge_id.in_(self._goal_challenges(classroom_id)),
         )
+
+    def goal_challenge_ids(self, classroom_id: int) -> set[int]:
+        return set(self.session.scalars(self._goal_challenges(classroom_id)))
+
+    def goal_classrooms(self, user_id: int, challenge_id: int) -> list[Classroom]:
+        """The student's turmas in which this challenge counts toward the class goal."""
+        turmas_with_challenge = (
+            select(Mission.classroom_id)
+            .join(MissionChallenge, MissionChallenge.mission_id == Mission.id)
+            .join(Challenge, Challenge.id == MissionChallenge.challenge_id)
+            .where(
+                MissionChallenge.challenge_id == challenge_id,
+                Mission.status == PUBLISHED,
+                Challenge.status == PUBLISHED,
+            )
+        )
+        query = (
+            select(Classroom)
+            .join(ClassroomMember, ClassroomMember.classroom_id == Classroom.id)
+            .where(ClassroomMember.user_id == user_id, Classroom.id.in_(turmas_with_challenge))
+            .order_by(Classroom.id)
+        )
+        return list(self.session.scalars(query))
 
     def goal_progress(self, classroom_id: int, week_start: datetime) -> int:
         query = select(func.count()).where(

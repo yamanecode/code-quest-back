@@ -6,13 +6,24 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.domain.badges import BADGES, Badge, BadgeStats, badge_codes_earned, badge_display
 from app.domain.challenge_types import ChallengeType
+from app.domain.enums import ContentStatus, Role
 from app.domain.gamification import (
+    RankedRow,
+    RankingPeriod,
+    RankingScope,
+    RankRow,
+    completed_every_mission,
+    completion_pct,
+    dense_rank,
     level_for,
     mission_completed,
+    period_start,
     streak,
     title_for,
+    window_around,
     xp_to_next_level,
 )
+from app.infra.db.models import Classroom
 from app.infra.repositories.badges import BadgeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.daily import DailyRepository
@@ -20,7 +31,8 @@ from app.infra.repositories.hints import HintRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.users import UserRepository
-from app.infra.repositories.xp import XPRepository
+from app.infra.repositories.xp import UserXP, XPRepository
+from app.services.exceptions import NotFound, ValidationFailed
 
 
 @dataclass(frozen=True)
@@ -65,6 +77,69 @@ class Profile:
     first_try_solves: int
     profile_public: bool
     badges: list[ProfileBadge]
+
+
+@dataclass(frozen=True)
+class RankingEntry:
+    position: int
+    username: str
+    xp: int
+    is_me: bool
+    profile_public: bool
+
+
+@dataclass(frozen=True)
+class Ranking:
+    scope: str
+    period: str
+    entries: list[RankingEntry]
+
+
+@dataclass(frozen=True)
+class PublicBadge:
+    code: str
+    name: str
+    tier: str
+    emoji: str
+
+
+@dataclass(frozen=True)
+class PublicProfile:
+    username: str
+    level: int
+    title: str
+    badges: list[PublicBadge]
+
+
+@dataclass(frozen=True)
+class StudentProgress:
+    username: str
+    xp_in_class: int
+    level: int
+    solved_in_class: int
+    missions_completed_in_class: int
+    hints_used: int
+    streak: int
+
+
+@dataclass(frozen=True)
+class ClassroomProgress:
+    completed_all_pct: int
+    students: list[StudentProgress]
+
+
+def _ranking_entries(
+    rows: list[UserXP], ranked: list[RankedRow], me_id: int | None
+) -> list[RankingEntry]:
+    public = {row.user_id: row.profile_public for row in rows}
+    return [
+        RankingEntry(row.position, row.username, row.xp, row.user_id == me_id, public[row.user_id])
+        for row in ranked
+    ]
+
+
+def _ranked(rows: list[UserXP]) -> list[RankedRow]:
+    return dense_rank(RankRow(row.user_id, row.username, row.xp) for row in rows)
 
 
 class GamificationService:
@@ -123,6 +198,88 @@ class GamificationService:
         user.profile_public = profile_public
         self.session.commit()
         return user.profile_public
+
+    def public_profile(self, username: str) -> PublicProfile:
+        user = self.users.get_by_username(username.lower())
+        # Professors, the system account and private profiles all look like a missing player.
+        if user is None or user.role != Role.STUDENT or not user.profile_public:
+            raise NotFound("player_not_found", "Perfil não encontrado.")
+        progress = self.level_info(user.id)
+        earned = self.badges.earned(user.id)
+        badges = [
+            PublicBadge(badge.code, badge.name, badge.tier, badge.emoji)
+            for badge in BADGES
+            if badge.code in earned
+        ]
+        return PublicProfile(user.username, progress.level, progress.title, badges)
+
+    # Rankings
+
+    def ranking(
+        self, user_id: int, scope: str, period: str, classroom_id: int | None = None
+    ) -> Ranking:
+        """The student's position with up to two neighbours above and below."""
+        since = period_start(RankingPeriod(period), self.clock.now())
+        if RankingScope(scope) == RankingScope.CLASSROOM:
+            if classroom_id is None:
+                raise ValidationFailed("classroom_required", "Escolha uma turma.")
+            if self.classrooms.get_membership(user_id, classroom_id) is None:
+                raise NotFound("classroom_not_found", "Turma não encontrada.")
+            rows = self.xp.xp_in_classroom_since(classroom_id, since)
+        else:
+            rows = self.xp.xp_by_user_since(since)
+        nearby = window_around(_ranked(rows), user_id)
+        return Ranking(scope, period, _ranking_entries(rows, nearby, me_id=user_id))
+
+    def classroom_ranking(self, professor_id: int, classroom_id: int, period: str) -> Ranking:
+        """Full turma ranking for the professor who owns the turma."""
+        self._own_classroom(professor_id, classroom_id)
+        since = period_start(RankingPeriod(period), self.clock.now())
+        rows = self.xp.xp_in_classroom_since(classroom_id, since)
+        entries = _ranking_entries(rows, _ranked(rows), me_id=None)
+        return Ranking(RankingScope.CLASSROOM, period, entries)
+
+    # Professor progress table
+
+    def classroom_progress(self, professor_id: int, classroom_id: int) -> ClassroomProgress:
+        self._own_classroom(professor_id, classroom_id)
+        xp_in_class = {row.user_id: row.xp for row in self.xp.xp_in_classroom_total(classroom_id)}
+        published = [
+            mission.id
+            for mission in self.missions.list_for_classroom(classroom_id)
+            if mission.status == ContentStatus.PUBLISHED
+        ]
+        by_mission = self.missions.published_challenge_ids_by_mission(published)
+        missions = [ids for ids in by_mission.values() if ids]
+        class_challenges = self.classrooms.goal_challenge_ids(classroom_id)
+
+        students = []
+        completed_all = 0
+        for member in self.classrooms.members(classroom_id):
+            solved = self.submissions.solved_challenge_ids(member.id)
+            completed_all += completed_every_mission(missions, solved)
+            students.append(
+                StudentProgress(
+                    username=member.username,
+                    xp_in_class=xp_in_class.get(member.id, 0),
+                    level=level_for(self.xp.xp_total(member.id)),
+                    solved_in_class=len(solved & class_challenges),
+                    missions_completed_in_class=self._completed_count(missions, solved),
+                    hints_used=self.hints.requested_count(member.id, class_challenges),
+                    streak=streak(self.submissions.solve_days(member.id), self.clock.today()),
+                )
+            )
+        return ClassroomProgress(completion_pct(completed_all, len(students)), students)
+
+    @staticmethod
+    def _completed_count(missions: list[list[int]], solved: set[int]) -> int:
+        return sum(mission_completed(ids, solved) for ids in missions)
+
+    def _own_classroom(self, professor_id: int, classroom_id: int) -> Classroom:
+        classroom = self.classrooms.get(classroom_id)
+        if classroom is None or classroom.professor_id != professor_id:
+            raise NotFound("classroom_not_found", "Turma não encontrada.")
+        return classroom
 
     @staticmethod
     def _profile_badge(badge: Badge, earned_at: datetime | None) -> ProfileBadge:

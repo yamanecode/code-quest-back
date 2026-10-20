@@ -95,3 +95,50 @@ def test_T_REPO_29_join_code_and_membership_round_trip(session):
 
     repo.remove_member(membership)
     assert repo.get_membership(ana.id, turma.id) is None
+
+
+def test_T_REPO_41_members_in_username_order(session):
+    turma = make_classroom(session)
+    for name in ("carla", "ana", "bia"):
+        add_member(session, make_user(session, name), turma)
+    add_member(session, make_user(session, "outra"), make_classroom(session))
+
+    members = ClassroomRepository(session).members(turma.id)
+    assert [user.username for user in members] == ["ana", "bia", "carla"]
+
+
+def test_T_REPO_42_goal_classrooms_of_a_solved_challenge(session):
+    ana = make_user(session)
+    with_it, also_with_it, without_it, not_member = (make_classroom(session) for _ in range(4))
+    for turma in (with_it, also_with_it, without_it):
+        add_member(session, ana, turma)
+    challenge = make_challenge(session, missions=(make_mission(session, with_it),))
+    link(session, make_mission(session, also_with_it), challenge)
+    link(session, make_mission(session, without_it, status=ContentStatus.DRAFT), challenge)
+    link(session, make_mission(session, not_member), challenge)
+    make_challenge(session, missions=(make_mission(session, without_it),))
+
+    found = ClassroomRepository(session).goal_classrooms(ana.id, challenge.id)
+    assert [turma.id for turma in found] == [with_it.id, also_with_it.id]
+
+
+def test_T_REPO_42_draft_challenge_counts_for_no_goal(session):
+    ana = make_user(session)
+    turma = make_classroom(session)
+    add_member(session, ana, turma)
+    draft = make_challenge(
+        session, status=ContentStatus.DRAFT, missions=(make_mission(session, turma),)
+    )
+
+    assert ClassroomRepository(session).goal_classrooms(ana.id, draft.id) == []
+
+
+def test_T_REPO_43_goal_challenge_ids_are_published_ones_in_published_missions(session):
+    turma = make_classroom(session)
+    mission = make_mission(session, turma)
+    counted = make_challenge(session, missions=(mission,))
+    make_challenge(session, status=ContentStatus.DRAFT, missions=(mission,))
+    make_challenge(session, missions=(make_mission(session, turma, status=ContentStatus.DRAFT),))
+    make_challenge(session, missions=(make_mission(session),))
+
+    assert ClassroomRepository(session).goal_challenge_ids(turma.id) == {counted.id}

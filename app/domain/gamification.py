@@ -2,6 +2,7 @@ import hashlib
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from enum import StrEnum
 from zoneinfo import ZoneInfo
 
 # The domain may not import app.core, so it keeps its own copy of the game time zone.
@@ -67,6 +68,14 @@ def mission_completed(challenge_ids: Iterable[int], solved_ids: set[int]) -> boo
     return bool(ids) and ids <= solved_ids
 
 
+def completed_every_mission(missions: Iterable[Iterable[int]], solved_ids: set[int]) -> bool:
+    """A turma with no completable mission is never 'completed'."""
+    challenge_lists = list(missions)
+    return bool(challenge_lists) and all(
+        mission_completed(ids, solved_ids) for ids in challenge_lists
+    )
+
+
 def week_start(moment: datetime) -> datetime:
     local = _to_local(moment)
     monday = local.date() - timedelta(days=local.weekday())
@@ -76,6 +85,20 @@ def week_start(moment: datetime) -> datetime:
 def month_start(moment: datetime) -> datetime:
     local = _to_local(moment)
     return datetime(local.year, local.month, 1, tzinfo=TIMEZONE)
+
+
+class RankingScope(StrEnum):
+    GLOBAL = "global"
+    CLASSROOM = "classroom"
+
+
+class RankingPeriod(StrEnum):
+    WEEK = "week"
+    MONTH = "month"
+
+
+def period_start(period: RankingPeriod, now: datetime) -> datetime:
+    return week_start(now) if period == RankingPeriod.WEEK else month_start(now)
 
 
 @dataclass(frozen=True)
@@ -128,3 +151,14 @@ def goal_target(weekly_goal: int | None, member_count: int, available: int) -> i
         return None
     base_target = weekly_goal if weekly_goal is not None else max(10, 5 * member_count)
     return min(base_target, available)
+
+
+def goal_reached(progress: int, target: int) -> bool:
+    return progress >= target
+
+
+def completion_pct(completed: int, total: int) -> int:
+    """Whole percentage, rounding halves up; 0 when there is nobody to count."""
+    if total == 0:
+        return 0
+    return (200 * completed + total) // (2 * total)

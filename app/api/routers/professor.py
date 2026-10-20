@@ -2,7 +2,8 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import Content, CurrentProfessor, require_professor
+from app.api.deps import Content, CurrentProfessor, Gamification, require_professor
+from app.api.schemas.gamification import ClassroomProgressOut, RankingOut, RankingPeriodIn
 from app.api.schemas.professor import (
     ChallengeIn,
     ChallengeOut,
@@ -45,6 +46,25 @@ def update_classroom(
 ) -> ClassroomOut:
     classroom = content.update_classroom(professor.id, classroom_id, body.name, body.weekly_goal)
     return ClassroomOut(**asdict(classroom))
+
+
+@router.get("/classrooms/{classroom_id}/progress")
+def classroom_progress(
+    classroom_id: int, professor: CurrentProfessor, gamification: Gamification
+) -> ClassroomProgressOut:
+    progress = gamification.classroom_progress(professor.id, classroom_id)
+    return ClassroomProgressOut(**asdict(progress))
+
+
+@router.get("/classrooms/{classroom_id}/rankings")
+def classroom_ranking(
+    classroom_id: int,
+    professor: CurrentProfessor,
+    gamification: Gamification,
+    period: RankingPeriodIn = "week",
+) -> RankingOut:
+    ranking = gamification.classroom_ranking(professor.id, classroom_id, period)
+    return RankingOut(**asdict(ranking))
 
 
 @router.get("/classrooms/{classroom_id}/missions")

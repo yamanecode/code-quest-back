@@ -13,6 +13,7 @@ from app.infra.repositories.daily import DailyRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
+from app.services.classroom_service import ClassroomService
 from app.services.exceptions import NotFound, ValidationFailed
 from app.services.gamification_service import BadgeInfo, GamificationService
 
@@ -101,10 +102,17 @@ def _summary(challenge: Challenge, solved_ids: set[int]) -> ChallengeSummary:
 class PlayService:
     """What a student does: browse visible missions, open challenges, answer, daily challenge."""
 
-    def __init__(self, session: Session, clock: Clock, gamification: GamificationService) -> None:
+    def __init__(
+        self,
+        session: Session,
+        clock: Clock,
+        gamification: GamificationService,
+        goals: ClassroomService,
+    ) -> None:
         self.session = session
         self.clock = clock
         self.gamification = gamification
+        self.goals = goals
         self.missions = MissionRepository(session)
         self.challenges = ChallengeRepository(session)
         self.classrooms = ClassroomRepository(session)
@@ -176,7 +184,11 @@ class PlayService:
             wrong = self.submissions.wrong_attempts_before_first_solve(user_id, challenge_id)
             xp_earned = xp_for_wrong_attempts(wrong)
             self.xp.add(user_id, challenge_id, xp_earned, now)
-        new_badges = self.gamification.award_new_badges(user_id) if is_correct else []
+        new_badges = []
+        if is_correct:
+            # Goal rewards first, so a class_goal badge is among the submitter's new badges.
+            self.goals.reward_completed_goals(user_id, challenge_id)
+            new_badges = self.gamification.award_new_badges(user_id)
         explanation = challenge.explanation if is_correct else None
         self.session.commit()
 

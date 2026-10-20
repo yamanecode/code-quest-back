@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.core.clock import Clock
 from app.domain.challenge_types import (
     SKILL_LABELS,
     ChallengeType,
@@ -24,6 +25,7 @@ from app.infra.db.models import Challenge, Classroom, Mission
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.missions import MissionRepository
+from app.services.classroom_service import Goal, class_goal
 from app.services.exceptions import Conflict, NotFound, ValidationFailed
 
 JOIN_CODE_ATTEMPTS = 10
@@ -39,14 +41,7 @@ class ClassroomView:
     name: str
     join_code: str
     weekly_goal: int | None
-    goal: dict | None
-
-
-def _classroom_view(classroom: Classroom) -> ClassroomView:
-    # The weekly goal is filled in with the class-goal rules (phase B6).
-    return ClassroomView(
-        classroom.id, classroom.name, classroom.join_code, classroom.weekly_goal, goal=None
-    )
+    goal: Goal | None
 
 
 @dataclass(frozen=True)
@@ -128,9 +123,13 @@ class ContentService:
     """Professor authoring: turmas, missions and challenges, always scoped to their owner."""
 
     def __init__(
-        self, session: Session, make_join_code: Callable[[], str] = random_join_code
+        self,
+        session: Session,
+        clock: Clock,
+        make_join_code: Callable[[], str] = random_join_code,
     ) -> None:
         self.session = session
+        self.clock = clock
         self.make_join_code = make_join_code
         self.classrooms = ClassroomRepository(session)
         self.missions = MissionRepository(session)
@@ -139,7 +138,7 @@ class ContentService:
     # Turmas
 
     def list_classrooms(self, professor_id: int) -> list[ClassroomView]:
-        return [_classroom_view(c) for c in self.classrooms.list_by_professor(professor_id)]
+        return [self._classroom_view(c) for c in self.classrooms.list_by_professor(professor_id)]
 
     def create_classroom(
         self, professor_id: int, name: str, weekly_goal: int | None
@@ -149,10 +148,10 @@ class ContentService:
             name.strip(), self._free_join_code(), professor_id, weekly_goal
         )
         self.session.commit()
-        return _classroom_view(classroom)
+        return self._classroom_view(classroom)
 
     def get_classroom(self, professor_id: int, classroom_id: int) -> ClassroomView:
-        return _classroom_view(self._own_classroom(professor_id, classroom_id))
+        return self._classroom_view(self._own_classroom(professor_id, classroom_id))
 
     def update_classroom(
         self, professor_id: int, classroom_id: int, name: str, weekly_goal: int | None
@@ -162,7 +161,16 @@ class ContentService:
         classroom.name = name.strip()
         classroom.weekly_goal = weekly_goal
         self.session.commit()
-        return _classroom_view(classroom)
+        return self._classroom_view(classroom)
+
+    def _classroom_view(self, classroom: Classroom) -> ClassroomView:
+        return ClassroomView(
+            classroom.id,
+            classroom.name,
+            classroom.join_code,
+            classroom.weekly_goal,
+            class_goal(self.classrooms, classroom, self.clock.now()),
+        )
 
     # Missions
 

@@ -60,7 +60,8 @@ class XPRepository:
             users_filter = and_(users_filter, User.id.in_(list(user_ids)))
         return self._xp_per_user(users_filter, XPEvent.created_at >= since)
 
-    def xp_in_classroom_since(self, classroom_id: int, since: datetime) -> list[UserXP]:
+    def _xp_in_classroom(self, classroom_id: int, *event_filters) -> list[UserXP]:
+        """Members of the turma with the XP of events on challenges of its missions."""
         members = select(ClassroomMember.user_id).where(
             ClassroomMember.classroom_id == classroom_id
         )
@@ -69,8 +70,14 @@ class XPRepository:
             .join(Mission, Mission.id == MissionChallenge.mission_id)
             .where(Mission.classroom_id == classroom_id)
         )
-        event_filter = and_(XPEvent.created_at >= since, XPEvent.challenge_id.in_(turma_challenges))
+        event_filter = and_(XPEvent.challenge_id.in_(turma_challenges), *event_filters)
         return self._xp_per_user(User.id.in_(members), event_filter)
+
+    def xp_in_classroom_since(self, classroom_id: int, since: datetime) -> list[UserXP]:
+        return self._xp_in_classroom(classroom_id, XPEvent.created_at >= since)
+
+    def xp_in_classroom_total(self, classroom_id: int) -> list[UserXP]:
+        return self._xp_in_classroom(classroom_id)
 
     def first_solve_types_on(self, user_id: int, day: date) -> set[str]:
         query = (
