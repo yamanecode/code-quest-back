@@ -118,6 +118,8 @@ uv run pytest tests/unit tests/integration -q
 powershell -File scripts/functional.ps1
 ```
 
+With `-Serve` the script only prepares the database and keeps the server running on port 8001 (for the frontend functional suite); it needs `CODEQUEST_PROFESSOR_PASSWORD`, the password of the functional professors `ft_prof` and `ft_prof2`.
+
 No test ever calls a real language model. `tests/live` holds an optional check against a real provider, excluded by default.
 
 ### Quality gate
