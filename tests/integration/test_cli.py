@@ -1,11 +1,15 @@
+import shutil
+from pathlib import Path
+
 from sqlalchemy import func, select
 
 from app import cli
 from app.domain.enums import Role
-from app.infra.db.models import User
+from app.infra.db.models import Mission, User
 from app.infra.security import verify_password
 
 PASSWORD = "senha-do-professor"
+BASE_DIR = Path(__file__).resolve().parents[2] / "content" / "base"
 
 
 def test_T_CLI_01_create_professor_with_password_from_env(session, monkeypatch, capsys):
@@ -61,6 +65,55 @@ def test_T_CLI_03_main_parses_create_professor(monkeypatch):
 
     assert cli.main(["create-professor", "prof_ana"]) == 0
     assert calls == ["prof_ana"]
+
+
+def test_T_CLI_03_main_parses_seed_demo_and_load_base(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "seed_demo", lambda session: calls.append("seed") or 0)
+    monkeypatch.setattr(cli, "load_base", lambda session, path: calls.append(path) or 0)
+    monkeypatch.setattr(cli, "open_session", lambda: _NullSession())
+
+    assert cli.main(["seed-demo"]) == 0
+    assert cli.main(["load-base", "content/base"]) == 0
+    assert calls == ["seed", "content/base"]
+
+
+def test_T_SEED_01_cli_seeds_once_with_password_from_env(session, monkeypatch, capsys):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+
+    assert cli.seed_demo(session) == 0
+    assert "Criado: professor prof_demo" in capsys.readouterr().out
+    assert cli.seed_demo(session) == 0
+    assert "nada foi criado" in capsys.readouterr().out
+
+
+def test_T_SEED_01_cli_reports_a_seed_error(session, monkeypatch, capsys):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", "curta")
+
+    assert cli.seed_demo(session) == 1
+    assert "8 a 72 caracteres" in capsys.readouterr().err
+
+
+def test_T_BASE_02_cli_loads_the_base_game(session, capsys):
+    assert cli.load_base(session, str(BASE_DIR)) == 0
+
+    out = capsys.readouterr().out
+    assert "Missão criada: Trilha: Pensamento algorítmico" in out
+    assert session.scalar(select(func.count()).select_from(Mission)) == 5
+    assert cli.load_base(session, str(BASE_DIR)) == 0
+    assert "Missão já existente, mantida: Desafios mistos" in capsys.readouterr().out
+
+
+def test_T_BASE_04_cli_names_the_broken_file_and_exits_1(session, capsys, tmp_path):
+    shutil.copy(BASE_DIR / "01-algoritmos.json", tmp_path / "09-sem-desafios.json")
+    broken = tmp_path / "09-sem-desafios.json"
+    text = broken.read_text(encoding="utf-8").replace('"challenges"', '"x"', 1)
+    broken.write_text(text, encoding="utf-8")
+
+    assert cli.load_base(session, str(tmp_path)) == 1
+    err = capsys.readouterr().err
+    assert "09-sem-desafios.json: A missão deve ter pelo menos um desafio." in err
+    assert session.scalar(select(func.count()).select_from(Mission)) == 0
 
 
 class _NullSession:
