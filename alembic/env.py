@@ -1,18 +1,22 @@
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 from app.core.config import get_settings
 
+# Importing Base through the models module also registers every table on its metadata.
+from app.infra.db.models import Base
+
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL)
+# Tests set the URL on the config; otherwise use the application database.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL.replace("%", "%%"))
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# Set to the ORM metadata once the models exist (phase B2).
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
