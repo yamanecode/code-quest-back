@@ -4,11 +4,17 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_clock
+from app.core.clock import FixedClock
 from app.core.config import get_settings
 from app.infra.db.models import Base
+from app.infra.db.session import get_session
+from app.main import create_app
+from tests.integration.factories import NOON
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 
@@ -33,3 +39,17 @@ def session(engine: Engine) -> Iterator[Session]:
         connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
     with Session(engine) as db_session:
         yield db_session
+
+
+@pytest.fixture
+def clock() -> FixedClock:
+    return FixedClock(NOON)
+
+
+@pytest.fixture
+def client(session: Session, clock: FixedClock) -> Iterator[TestClient]:
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_clock] = lambda: clock
+    with TestClient(app) as test_client:
+        yield test_client
