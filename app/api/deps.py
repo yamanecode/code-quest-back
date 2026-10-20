@@ -11,6 +11,7 @@ from app.domain.enums import Role
 from app.infra.db.session import get_session
 from app.services.auth_service import Account, AuthService
 from app.services.classroom_service import ClassroomService
+from app.services.content_service import ContentService
 from app.services.exceptions import Forbidden, Unauthorized
 
 bearer = HTTPBearer(auto_error=False)
@@ -30,6 +31,10 @@ def get_auth_service(
 
 def get_classroom_service(session: DbSession) -> ClassroomService:
     return ClassroomService(session)
+
+
+def get_content_service(session: DbSession) -> ContentService:
+    return ContentService(session)
 
 
 def get_current_user(
@@ -57,3 +62,4 @@ CurrentStudent = Annotated[Account, Depends(require_student)]
 CurrentProfessor = Annotated[Account, Depends(require_professor)]
 Auth = Annotated[AuthService, Depends(get_auth_service)]
 Classrooms = Annotated[ClassroomService, Depends(get_classroom_service)]
+Content = Annotated[ContentService, Depends(get_content_service)]

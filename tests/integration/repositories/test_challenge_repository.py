@@ -44,3 +44,13 @@ def test_T_REPO_28_published_examples_newest_first_same_owner_and_type(session):
 
     found = repo.published_examples(professor.id, ChallengeType.ORDERING)
     assert found == [examples[3], examples[2], examples[1]]
+
+
+def test_T_REPO_34_owned_ids_keeps_only_the_owners_challenges(session):
+    owner, other = make_user(session, role=Role.PROFESSOR), make_user(session, role=Role.PROFESSOR)
+    mine = make_challenge(session, owner)
+    theirs = make_challenge(session, other)
+
+    owned = ChallengeRepository(session).owned_ids(owner.id, [mine.id, theirs.id, 9999])
+
+    assert owned == {mine.id}

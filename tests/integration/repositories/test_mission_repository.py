@@ -72,3 +72,17 @@ def test_T_REPO_31_mission_has_submissions_through_its_challenges(session):
 
     submit(session, make_user(session), challenge, correct=False)
     assert repo.has_submissions(mission.id) is True
+
+
+def test_T_REPO_33_mission_has_published_challenge(session):
+    repository = MissionRepository(session)
+    empty = make_mission(session, status=DRAFT)
+    drafts_only = make_mission(session, status=DRAFT)
+    make_challenge(session, status=DRAFT, missions=(drafts_only,))
+    ready = make_mission(session, status=DRAFT)
+    make_challenge(session, status=DRAFT, missions=(ready,))
+    make_challenge(session, missions=(ready,))
+
+    assert repository.has_published_challenge(empty.id) is False
+    assert repository.has_published_challenge(drafts_only.id) is False
+    assert repository.has_published_challenge(ready.id) is True

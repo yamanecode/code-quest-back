@@ -69,6 +69,15 @@ class MissionRepository:
         )
         return list(self.session.scalars(query))
 
+    def has_published_challenge(self, mission_id: int) -> bool:
+        condition = (
+            exists()
+            .where(MissionChallenge.mission_id == mission_id)
+            .where(MissionChallenge.challenge_id == Challenge.id)
+            .where(Challenge.status == PUBLISHED)
+        )
+        return bool(self.session.scalar(select(condition)))
+
     def has_submissions(self, mission_id: int) -> bool:
         mission_challenges = select(MissionChallenge.challenge_id).where(
             MissionChallenge.mission_id == mission_id

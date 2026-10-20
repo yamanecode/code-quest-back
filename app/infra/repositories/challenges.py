@@ -52,6 +52,12 @@ class ChallengeRepository:
         query = select(Challenge).where(Challenge.owner_id == owner_id).order_by(Challenge.id)
         return list(self.session.scalars(query))
 
+    def owned_ids(self, owner_id: int, challenge_ids: list[int]) -> set[int]:
+        query = select(Challenge.id).where(
+            Challenge.owner_id == owner_id, Challenge.id.in_(challenge_ids)
+        )
+        return set(self.session.scalars(query))
+
     def delete(self, challenge: Challenge) -> None:
         self.session.delete(challenge)
         self.session.flush()
