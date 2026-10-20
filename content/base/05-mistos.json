@@ -1,0 +1,192 @@
+{
+  "title": "Desafios mistos",
+  "position": 5,
+  "description": "Um desafio de cada habilidade. Veja se você reconhece qual delas cada problema pede.",
+  "challenges": [
+    {
+      "title": "Reforma do quarto",
+      "statement": "Você vai reformar seu quarto. Pinta-se sempre de cima para baixo, para os respingos não estragarem o que já ficou pronto. A parede precisa ser lixada antes de receber tinta, e o pó da lixa suja tudo o que já foi pintado. O piso novo só entra depois de toda a pintura, e os móveis saem antes de qualquer serviço e só voltam no final. Coloque as tarefas em ordem.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Lixar as paredes"
+          },
+          {
+            "id": "d",
+            "text": "Pintar as paredes"
+          },
+          {
+            "id": "f",
+            "text": "Devolver os móveis ao quarto"
+          },
+          {
+            "id": "a",
+            "text": "Tirar os móveis do quarto"
+          },
+          {
+            "id": "c",
+            "text": "Pintar o teto"
+          },
+          {
+            "id": "e",
+            "text": "Instalar o piso novo"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f"
+        ]
+      },
+      "explanation": "Cada regra elimina uma possibilidade: lixar antes de pintar qualquer coisa (por causa do pó), teto antes das paredes (de cima para baixo), piso depois da tinta e móveis nas pontas. Juntas, as regras só deixam uma ordem possível."
+    },
+    {
+      "title": "Robô aspirador",
+      "statement": "Um robô aspirador funciona repetindo três tipos de tarefa: perceber o ambiente com sensores, decidir o que fazer e agir. Para programar o robô, os engenheiros primeiro separaram cada função em um desses três grupos. Indique o grupo de cada função.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Perceber"
+          },
+          {
+            "id": "g2",
+            "text": "Decidir"
+          },
+          {
+            "id": "g3",
+            "text": "Agir"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Detectar uma parede à frente"
+          },
+          {
+            "id": "b",
+            "text": "Medir quanto resta de bateria"
+          },
+          {
+            "id": "c",
+            "text": "Notar sujeira acumulada no chão"
+          },
+          {
+            "id": "d",
+            "text": "Escolher virar à direita ou à esquerda"
+          },
+          {
+            "id": "e",
+            "text": "Optar por voltar à base quando a bateria estiver fraca"
+          },
+          {
+            "id": "f",
+            "text": "Andar em linha reta"
+          },
+          {
+            "id": "g",
+            "text": "Girar no próprio lugar"
+          },
+          {
+            "id": "h",
+            "text": "Ligar a escova na força máxima"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g1",
+          "d": "g2",
+          "e": "g2",
+          "f": "g3",
+          "g": "g3",
+          "h": "g3"
+        }
+      },
+      "explanation": "Perceber, decidir e agir é a decomposição usada em quase todo robô: sensores informam, a lógica escolhe e os motores executam. Cada grupo pode ser construído e testado separadamente."
+    },
+    {
+      "title": "Ônibus da excursão",
+      "statement": "A escola vai levar alunos e professores a um museu. A secretaria recebeu da empresa de ônibus e da coordenação várias informações e precisa decidir quantos ônibus reservar, sabendo que ninguém pode viajar em pé.",
+      "type": "filtering",
+      "content": {
+        "question": "Quantos ônibus a escola precisa reservar?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Vão 95 estudantes"
+          },
+          {
+            "id": "b",
+            "text": "Vão 5 professores"
+          },
+          {
+            "id": "c",
+            "text": "Cada ônibus leva 46 passageiros sentados"
+          },
+          {
+            "id": "d",
+            "text": "A viagem dura 2 horas"
+          },
+          {
+            "id": "e",
+            "text": "A saída é às 7h"
+          },
+          {
+            "id": "f",
+            "text": "Cada ônibus custa R$ 1.200,00"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "explanation": "São 100 pessoas; 2 ônibus levam 92, então são necessários 3. Esquecer os professores levaria à resposta errada. Duração, horário e preço não mudam quantos ônibus são precisos."
+    },
+    {
+      "title": "Dias de treino",
+      "statement": "Júlia treina natação em dias alternados: treina um dia, descansa no seguinte e volta a treinar, sem parar nos fins de semana. Os primeiros treinos dela estão na sequência abaixo. Em que dia da semana será o próximo treino?",
+      "type": "pattern",
+      "content": {
+        "sequence": [
+          "segunda",
+          "quarta",
+          "sexta",
+          "domingo"
+        ],
+        "options": [
+          {
+            "id": "a",
+            "text": "segunda"
+          },
+          {
+            "id": "b",
+            "text": "terça"
+          },
+          {
+            "id": "c",
+            "text": "quarta"
+          },
+          {
+            "id": "d",
+            "text": "quinta"
+          },
+          {
+            "id": "e",
+            "text": "sábado"
+          }
+        ],
+        "solution": "b"
+      },
+      "explanation": "A regra é pular um dia. Depois de domingo vem segunda (descanso) e então terça (treino). A semana recomeça, mas a regra continua a mesma; quem responde segunda esqueceu o dia de descanso."
+    }
+  ]
+}

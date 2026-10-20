@@ -1,15 +1,25 @@
-from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     DATABASE_URL: str
-    SECRET_KEY: str
-    OPENAI_API_KEY: str = ""  # optional for now
-    GEMINI_API_KEY: str = ""
-    POSTGRES_PASSWORD: str
+    TEST_DATABASE_URL: str | None = None
+    JWT_SECRET: str
+    JWT_EXPIRE_HOURS: int = 8
+    FRONTEND_ORIGIN: str = "http://localhost:3000"
+    HINT_CAP: int = 5
+    HINT_COOLDOWN_SECONDS: int = 15
+    LLM_PROVIDER: str = "fake"
+    LLM_BASE_URL: str = ""
+    LLM_MODEL: str = ""
+    LLM_API_KEY: str = ""
+    FAKE_LLM_LOG: str | None = None
 
-    class Config:
-        env_file = ".env"
 
-
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

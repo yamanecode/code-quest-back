@@ -1,0 +1,423 @@
+{
+  "title": "Trilha: Decomposição",
+  "position": 2,
+  "description": "Decompor é dividir um problema grande em partes menores. Engenheiros fazem isso para construir pontes; você faz isso para organizar uma festa.",
+  "challenges": [
+    {
+      "title": "Campeonato da escola",
+      "statement": "O grêmio vai organizar um campeonato de futsal entre as turmas. Para ninguém se perder, o trabalho foi dividido em quatro frentes, cada uma com um responsável: inscrições, tabela e regras, dia dos jogos e encerramento. Indique a que frente pertence cada tarefa.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Inscrições"
+          },
+          {
+            "id": "g2",
+            "text": "Tabela e regras"
+          },
+          {
+            "id": "g3",
+            "text": "Dia dos jogos"
+          },
+          {
+            "id": "g4",
+            "text": "Encerramento"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Divulgar o campeonato nos murais"
+          },
+          {
+            "id": "b",
+            "text": "Receber a lista de jogadores de cada turma"
+          },
+          {
+            "id": "c",
+            "text": "Sortear os grupos"
+          },
+          {
+            "id": "d",
+            "text": "Definir o tempo de cada partida"
+          },
+          {
+            "id": "e",
+            "text": "Montar o calendário dos jogos"
+          },
+          {
+            "id": "f",
+            "text": "Apitar as partidas"
+          },
+          {
+            "id": "g",
+            "text": "Anotar os gols na súmula"
+          },
+          {
+            "id": "h",
+            "text": "Entregar as medalhas"
+          },
+          {
+            "id": "i",
+            "text": "Publicar a classificação final"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g2",
+          "f": "g3",
+          "g": "g3",
+          "h": "g4",
+          "i": "g4"
+        }
+      },
+      "explanation": "Dividir o campeonato em frentes permite que cada responsável cuide de uma lista menor e mostra rapidamente o que ainda falta. Quem sorteia os grupos não precisa saber como entregar medalhas."
+    },
+    {
+      "title": "Podcast da turma",
+      "statement": "Sua turma vai lançar um episódio de podcast com uma entrevista. O projeto foi dividido em quatro partes, e cada dupla ficará com uma: roteiro, gravação, edição e divulgação. Indique em que parte entra cada tarefa.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Roteiro"
+          },
+          {
+            "id": "g2",
+            "text": "Gravação"
+          },
+          {
+            "id": "g3",
+            "text": "Edição"
+          },
+          {
+            "id": "g4",
+            "text": "Divulgação"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Escolher o tema do episódio"
+          },
+          {
+            "id": "b",
+            "text": "Escrever as perguntas da entrevista"
+          },
+          {
+            "id": "c",
+            "text": "Testar o microfone antes de começar"
+          },
+          {
+            "id": "d",
+            "text": "Gravar a conversa com o entrevistado"
+          },
+          {
+            "id": "e",
+            "text": "Cortar as pausas longas"
+          },
+          {
+            "id": "f",
+            "text": "Inserir a música de abertura"
+          },
+          {
+            "id": "g",
+            "text": "Escrever o convite para ouvir o episódio"
+          },
+          {
+            "id": "h",
+            "text": "Postar o link no grupo da escola"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g3",
+          "f": "g3",
+          "g": "g4",
+          "h": "g4"
+        }
+      },
+      "explanation": "Cada parte tem um resultado claro: o roteiro produz as perguntas, a gravação produz o áudio bruto, a edição produz o episódio final e a divulgação leva o episódio às pessoas. Assim as duplas trabalham sem depender umas das outras o tempo todo."
+    },
+    {
+      "title": "Aplicativo de delivery",
+      "statement": "Uma equipe vai criar um aplicativo de pedidos de comida. Antes de programar qualquer coisa, ela dividiu o aplicativo em quatro módulos: cadastro, cardápio, pagamento e entrega. Indique a que módulo pertence cada função.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Cadastro"
+          },
+          {
+            "id": "g2",
+            "text": "Cardápio"
+          },
+          {
+            "id": "g3",
+            "text": "Pagamento"
+          },
+          {
+            "id": "g4",
+            "text": "Entrega"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Criar nome de usuário e senha"
+          },
+          {
+            "id": "b",
+            "text": "Confirmar o número do celular"
+          },
+          {
+            "id": "c",
+            "text": "Mostrar a foto e o preço de cada prato"
+          },
+          {
+            "id": "d",
+            "text": "Filtrar só os pratos vegetarianos"
+          },
+          {
+            "id": "e",
+            "text": "Escolher entre Pix e cartão"
+          },
+          {
+            "id": "f",
+            "text": "Gerar o comprovante da compra"
+          },
+          {
+            "id": "g",
+            "text": "Mostrar o entregador no mapa"
+          },
+          {
+            "id": "h",
+            "text": "Confirmar que o pedido chegou"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g3",
+          "f": "g3",
+          "g": "g4",
+          "h": "g4"
+        }
+      },
+      "explanation": "Sistemas grandes são construídos assim: divididos em módulos menores, cada um com uma responsabilidade. Se o pagamento falhar, a equipe sabe exatamente em que parte procurar o problema."
+    },
+    {
+      "title": "Viagem de formatura",
+      "statement": "A comissão de formatura vai organizar uma viagem de três dias. Para dividir o trabalho, criou quatro grupos: transporte, hospedagem, alimentação e passeios. Indique a que grupo cabe cada tarefa.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Transporte"
+          },
+          {
+            "id": "g2",
+            "text": "Hospedagem"
+          },
+          {
+            "id": "g3",
+            "text": "Alimentação"
+          },
+          {
+            "id": "g4",
+            "text": "Passeios"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Fretar o ônibus"
+          },
+          {
+            "id": "b",
+            "text": "Definir o horário de saída"
+          },
+          {
+            "id": "c",
+            "text": "Reservar os quartos da pousada"
+          },
+          {
+            "id": "d",
+            "text": "Combinar quem divide cada quarto"
+          },
+          {
+            "id": "e",
+            "text": "Encomendar os lanches da estrada"
+          },
+          {
+            "id": "f",
+            "text": "Reservar o restaurante do jantar"
+          },
+          {
+            "id": "g",
+            "text": "Comprar os ingressos do parque"
+          },
+          {
+            "id": "h",
+            "text": "Contratar um guia para a trilha"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g3",
+          "f": "g3",
+          "g": "g4",
+          "h": "g4"
+        }
+      },
+      "explanation": "Um problema como \"organizar a viagem\" é grande demais para resolver de uma vez. Separado em quatro partes, cada grupo sabe o que é seu, e a viagem fica pronta quando todas as partes ficam prontas."
+    },
+    {
+      "title": "A internet caiu",
+      "statement": "A internet da sua casa parou de funcionar. Um técnico ensina a investigar o problema por partes: primeiro o seu aparelho, depois o roteador e, por fim, a operadora. Assim, você não liga para o suporte por um problema que estava no celular. Indique a que parte pertence cada verificação.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Aparelho"
+          },
+          {
+            "id": "g2",
+            "text": "Roteador"
+          },
+          {
+            "id": "g3",
+            "text": "Operadora"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Ver se o Wi-Fi do celular está ligado"
+          },
+          {
+            "id": "b",
+            "text": "Reiniciar o celular"
+          },
+          {
+            "id": "c",
+            "text": "Ver se as luzes do roteador estão acesas"
+          },
+          {
+            "id": "d",
+            "text": "Desligar e religar o roteador"
+          },
+          {
+            "id": "e",
+            "text": "Conferir se o cabo está bem encaixado no roteador"
+          },
+          {
+            "id": "f",
+            "text": "Consultar no site da operadora se há falha na região"
+          },
+          {
+            "id": "g",
+            "text": "Ligar para o suporte da operadora"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g2",
+          "f": "g3",
+          "g": "g3"
+        }
+      },
+      "explanation": "Decompor um defeito em partes permite testar uma de cada vez e eliminar suspeitos. Técnicos de informática usam exatamente essa estratégia para encontrar a causa de um problema."
+    },
+    {
+      "title": "Horta comunitária",
+      "statement": "Os moradores de um bairro vão transformar um terreno vazio em uma horta comunitária. A associação dividiu o projeto em quatro fases: planejamento, preparo do terreno, plantio e cuidados. Indique em que fase entra cada tarefa.",
+      "type": "grouping",
+      "content": {
+        "groups": [
+          {
+            "id": "g1",
+            "text": "Planejamento"
+          },
+          {
+            "id": "g2",
+            "text": "Preparo do terreno"
+          },
+          {
+            "id": "g3",
+            "text": "Plantio"
+          },
+          {
+            "id": "g4",
+            "text": "Cuidados"
+          }
+        ],
+        "items": [
+          {
+            "id": "a",
+            "text": "Escolher as verduras da estação"
+          },
+          {
+            "id": "b",
+            "text": "Medir o espaço disponível"
+          },
+          {
+            "id": "c",
+            "text": "Retirar pedras e entulho"
+          },
+          {
+            "id": "d",
+            "text": "Misturar adubo à terra"
+          },
+          {
+            "id": "e",
+            "text": "Semear a alface"
+          },
+          {
+            "id": "f",
+            "text": "Plantar as mudas de tomate"
+          },
+          {
+            "id": "g",
+            "text": "Regar todo fim de tarde"
+          },
+          {
+            "id": "h",
+            "text": "Arrancar as ervas daninhas"
+          }
+        ],
+        "solution": {
+          "a": "g1",
+          "b": "g1",
+          "c": "g2",
+          "d": "g2",
+          "e": "g3",
+          "f": "g3",
+          "g": "g4",
+          "h": "g4"
+        }
+      },
+      "explanation": "Dividir o projeto em fases mostra o que precisa estar pronto antes de cada etapa e permite que grupos diferentes de moradores cuidem de partes diferentes."
+    }
+  ]
+}

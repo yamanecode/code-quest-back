@@ -1,0 +1,249 @@
+{
+  "title": "Trilha: Abstração",
+  "position": 3,
+  "description": "Abstrair é separar o que importa do que é detalhe. Um mapa de metrô faz isso: mostra as estações e as ligações e esconde todo o resto.",
+  "challenges": [
+    {
+      "title": "A caminho da escola",
+      "statement": "Lia mora longe da escola e faz o mesmo trajeto todos os dias. Ela quer saber a que horas chega à escola para não se atrasar para a primeira aula. Algumas informações abaixo ajudam a responder; outras são só detalhes do trajeto.",
+      "type": "filtering",
+      "content": {
+        "question": "A que horas Lia chega à escola?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Lia pega o ônibus às 6h50"
+          },
+          {
+            "id": "b",
+            "text": "A viagem de ônibus dura 25 minutos"
+          },
+          {
+            "id": "c",
+            "text": "Do ponto até a escola ela caminha 5 minutos"
+          },
+          {
+            "id": "d",
+            "text": "O ônibus é azul e branco"
+          },
+          {
+            "id": "e",
+            "text": "A passagem custa R$ 5,00"
+          },
+          {
+            "id": "f",
+            "text": "Lia sempre senta na janela"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "explanation": "Com só três informações a resposta sai: 6h50 + 25 min + 5 min = 7h20. A cor do ônibus, o preço e o lugar onde ela senta não mudam a hora de chegada."
+    },
+    {
+      "title": "Pintura da sala",
+      "statement": "Seu tio vai pintar a parede da sala e pediu ajuda para calcular quantas latas comprar. Ele passou várias informações de uma vez, algumas da loja, outras da própria parede. Marque somente as necessárias para responder.",
+      "type": "filtering",
+      "content": {
+        "question": "Quantas latas de tinta é preciso comprar?",
+        "items": [
+          {
+            "id": "a",
+            "text": "A parede tem 30 m²"
+          },
+          {
+            "id": "b",
+            "text": "Cada lata pinta 12 m² com uma demão"
+          },
+          {
+            "id": "c",
+            "text": "A parede vai receber duas demãos"
+          },
+          {
+            "id": "d",
+            "text": "A tinta escolhida é azul-claro"
+          },
+          {
+            "id": "e",
+            "text": "Cada lata custa R$ 89,00"
+          },
+          {
+            "id": "f",
+            "text": "A loja fica a 2 km de casa"
+          },
+          {
+            "id": "g",
+            "text": "A pintura será feita no sábado"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "explanation": "Duas demãos em 30 m² equivalem a pintar 60 m²; com 12 m² por lata, são 5 latas. O preço seria necessário se a pergunta fosse o custo, mas não é."
+    },
+    {
+      "title": "Bolo para mais gente",
+      "statement": "Uma receita de bolo de chocolate foi copiada de um caderno antigo. Você vai fazer o bolo para a festa da turma, que terá 12 pessoas, e quer saber só uma coisa: quanta farinha comprar.",
+      "type": "filtering",
+      "content": {
+        "question": "Quantas xícaras de farinha são necessárias para 12 pessoas?",
+        "items": [
+          {
+            "id": "a",
+            "text": "A receita serve 6 pessoas"
+          },
+          {
+            "id": "b",
+            "text": "A receita leva 2 xícaras de farinha"
+          },
+          {
+            "id": "c",
+            "text": "A receita leva 3 ovos"
+          },
+          {
+            "id": "d",
+            "text": "O forno deve estar a 180 °C"
+          },
+          {
+            "id": "e",
+            "text": "A forma deve ser untada com manteiga"
+          },
+          {
+            "id": "f",
+            "text": "O bolo assa em 40 minutos"
+          }
+        ],
+        "solution": [
+          "a",
+          "b"
+        ]
+      },
+      "explanation": "Para 12 pessoas a receita é dobrada, então são 4 xícaras. Os ovos também dobrariam, mas a pergunta é só sobre farinha; forno, forma e tempo não mudam essa conta."
+    },
+    {
+      "title": "Qual é o armário?",
+      "statement": "No primeiro dia de aula, Bia esqueceu o número do seu armário. A coordenadora não lembra o número exato, mas passou algumas pistas, misturadas a outras informações sobre os armários.",
+      "type": "filtering",
+      "content": {
+        "question": "Qual é o número do armário de Bia?",
+        "items": [
+          {
+            "id": "a",
+            "text": "O número do armário de Bia é par"
+          },
+          {
+            "id": "b",
+            "text": "O armário de Bia é um dos três que ficam entre o 10 e o 14"
+          },
+          {
+            "id": "c",
+            "text": "Os armários vão do 1 ao 20"
+          },
+          {
+            "id": "d",
+            "text": "O armário de Caio é o 7"
+          },
+          {
+            "id": "e",
+            "text": "Bia guarda ali o material de educação física"
+          },
+          {
+            "id": "f",
+            "text": "Todos os armários são cinza"
+          }
+        ],
+        "solution": [
+          "a",
+          "b"
+        ]
+      },
+      "explanation": "Entre o 10 e o 14 ficam o 11, o 12 e o 13, e só o 12 é par. A numeração de 1 a 20 parece útil, mas não muda a resposta: as duas pistas sobre Bia já bastam."
+    },
+    {
+      "title": "Quem chegou em segundo?",
+      "statement": "Quatro amigos apostaram uma corrida no parque. Depois, cada um contou uma parte do que aconteceu, e as falas vieram misturadas com outros comentários. Marque só as informações necessárias para descobrir quem chegou em segundo lugar.",
+      "type": "filtering",
+      "content": {
+        "question": "Quem chegou em segundo lugar?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Davi chegou antes de Ana"
+          },
+          {
+            "id": "b",
+            "text": "Ana chegou antes de Bruno"
+          },
+          {
+            "id": "c",
+            "text": "Carla chegou depois de Bruno"
+          },
+          {
+            "id": "d",
+            "text": "A corrida tinha 3 km"
+          },
+          {
+            "id": "e",
+            "text": "Bruno usava tênis vermelho"
+          },
+          {
+            "id": "f",
+            "text": "Carla treina às segundas-feiras"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "explanation": "As três comparações dão a ordem completa: Davi, Ana, Bruno e Carla, então Ana foi a segunda. Sem qualquer uma delas, não daria para ter certeza. Distância, tênis e treino são detalhes da história."
+    },
+    {
+      "title": "Conta de luz",
+      "statement": "A família de Rafael recebeu a conta de energia e ele quer conferir o valor. A conta traz muitas informações: consumo, histórico, avisos e dicas de economia. Marque somente o que é necessário para calcular o valor a pagar neste mês.",
+      "type": "filtering",
+      "content": {
+        "question": "Quanto a família vai pagar de energia neste mês?",
+        "items": [
+          {
+            "id": "a",
+            "text": "Consumo deste mês: 200 kWh"
+          },
+          {
+            "id": "b",
+            "text": "Preço da energia: R$ 0,80 por kWh"
+          },
+          {
+            "id": "c",
+            "text": "Taxa fixa mensal: R$ 15,00"
+          },
+          {
+            "id": "d",
+            "text": "Consumo do mês passado: 180 kWh"
+          },
+          {
+            "id": "e",
+            "text": "A conta vence no dia 10"
+          },
+          {
+            "id": "f",
+            "text": "A geladeira é o aparelho que mais gasta"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "explanation": "200 × 0,80 + 15 = R$ 175,00. O consumo do mês passado é útil para comparar, mas não para calcular a conta deste mês; vencimento e dicas são detalhes."
+    }
+  ]
+}

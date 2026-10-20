@@ -1,0 +1,249 @@
+{
+  "title": "Trilha: Pensamento algorítmico",
+  "position": 1,
+  "description": "Algoritmo é uma sequência de passos em que a ordem importa. Ele está em receitas, manuais, no GPS e em todo programa de computador.",
+  "challenges": [
+    {
+      "title": "Primeiro dia de estágio",
+      "statement": "Ana começa hoje um estágio em uma empresa de tecnologia. Na portaria, ela só recebe o crachá depois de apresentar um documento. O treinamento de segurança só pode ser feito por quem já tem crachá, e a mesa de trabalho só é liberada para quem concluiu o treinamento. Coloque os passos do dia de Ana em ordem.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Receber o crachá"
+          },
+          {
+            "id": "d",
+            "text": "Ocupar a mesa de trabalho"
+          },
+          {
+            "id": "a",
+            "text": "Apresentar um documento na portaria"
+          },
+          {
+            "id": "c",
+            "text": "Fazer o treinamento de segurança"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      "explanation": "Cada passo é condição para o seguinte: sem documento não há crachá, sem crachá não há treinamento e sem treinamento a mesa não é liberada. Quando uma etapa depende de outra, a ordem não é escolha: é obrigação."
+    },
+    {
+      "title": "Encomenda no depósito",
+      "statement": "Em um depósito de loja virtual, todo pedido começa quando aparece no sistema. Os produtos são conferidos com a nota fiscal depois de separados e antes de a caixa ser fechada. A etiqueta só pode ser colada na caixa já fechada, e a transportadora não aceita caixa sem etiqueta. Coloque em ordem o caminho de um pedido.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Separar os produtos no estoque"
+          },
+          {
+            "id": "d",
+            "text": "Embalar e fechar a caixa"
+          },
+          {
+            "id": "f",
+            "text": "Entregar a caixa à transportadora"
+          },
+          {
+            "id": "a",
+            "text": "Receber o pedido no sistema"
+          },
+          {
+            "id": "c",
+            "text": "Conferir os produtos com a nota fiscal"
+          },
+          {
+            "id": "e",
+            "text": "Imprimir e colar a etiqueta"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f"
+        ]
+      },
+      "explanation": "As regras do enunciado formam uma corrente: cada uma diz o que precisa vir antes de quê. Ler essas restrições e montar a sequência que respeita todas é exatamente o que um algoritmo de logística faz."
+    },
+    {
+      "title": "Troca de pneu",
+      "statement": "Um pneu furou na estrada. Os parafusos da roda são muito apertados: com a roda no ar, ela gira e não dá para fazer força. Por isso, eles são afrouxados com o pneu ainda no chão e só recebem o aperto final quando o carro volta ao chão. Antes de tudo, é preciso sinalizar o carro. Coloque os passos em ordem.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Afrouxar os parafusos com o carro no chão"
+          },
+          {
+            "id": "d",
+            "text": "Retirar os parafusos e o pneu furado"
+          },
+          {
+            "id": "f",
+            "text": "Baixar o carro"
+          },
+          {
+            "id": "a",
+            "text": "Ligar o pisca-alerta e colocar o triângulo"
+          },
+          {
+            "id": "c",
+            "text": "Levantar o carro com o macaco"
+          },
+          {
+            "id": "e",
+            "text": "Encaixar o estepe e colocar os parafusos"
+          },
+          {
+            "id": "g",
+            "text": "Apertar bem os parafusos"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f",
+          "g"
+        ]
+      },
+      "explanation": "O detalhe que muda a ordem está no enunciado: os parafusos são afrouxados antes de levantar o carro e apertados depois de baixá-lo, porque com a roda no ar ela gira. Um bom algoritmo considera as condições em que cada passo funciona."
+    },
+    {
+      "title": "Feira de ciências",
+      "statement": "A turma vai apresentar um experimento na feira de ciências: \"plantas crescem mais com luz natural ou com luz de LED?\". O professor exige que a hipótese seja escrita logo depois de escolhida a pergunta, antes de planejar o experimento, que a conclusão compare os resultados com a hipótese e que o pôster mostre a conclusão. Coloque as etapas em ordem.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Escrever a hipótese"
+          },
+          {
+            "id": "d",
+            "text": "Cultivar as plantas e anotar o crescimento"
+          },
+          {
+            "id": "f",
+            "text": "Montar o pôster com a conclusão"
+          },
+          {
+            "id": "a",
+            "text": "Escolher a pergunta de pesquisa"
+          },
+          {
+            "id": "c",
+            "text": "Planejar o experimento"
+          },
+          {
+            "id": "e",
+            "text": "Comparar os resultados com a hipótese"
+          },
+          {
+            "id": "g",
+            "text": "Apresentar na feira"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f",
+          "g"
+        ]
+      },
+      "explanation": "O método científico é um algoritmo: a hipótese vem antes do teste, para não ser ajustada ao resultado; a comparação precisa dos dados anotados; e o pôster só pode mostrar uma conclusão que já existe."
+    },
+    {
+      "title": "Recorde da turma",
+      "statement": "O professor tem 30 fichas com as notas da turma, viradas para baixo em uma pilha. Ele só pode virar uma ficha por vez e quer descobrir a maior nota guardando na memória apenas um número. Coloque em ordem os passos de um método que funciona para qualquer quantidade de fichas.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Virar a próxima ficha"
+          },
+          {
+            "id": "d",
+            "text": "Repetir os dois passos anteriores até acabarem as fichas"
+          },
+          {
+            "id": "a",
+            "text": "Virar a primeira ficha e guardar sua nota como \"maior até agora\""
+          },
+          {
+            "id": "c",
+            "text": "Se a nota for maior que a guardada, guardar a nova no lugar"
+          },
+          {
+            "id": "e",
+            "text": "Anunciar a nota guardada como a maior"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ]
+      },
+      "explanation": "Este é um algoritmo clássico: guardar o melhor valor visto até o momento e comparar cada novo item com ele. Ele funciona para 30 ou 3 mil fichas, e a resposta só pode ser dada depois de olhar todas."
+    },
+    {
+      "title": "Adivinhe o número",
+      "statement": "Um amigo pensou em um número de 1 a 100 e, a cada chute, só responde \"acertou\", \"é maior\" ou \"é menor\". Existe uma estratégia que sempre acerta em no máximo 7 chutes, qualquer que seja o número. Coloque em ordem os passos dessa estratégia.",
+      "type": "ordering",
+      "content": {
+        "items": [
+          {
+            "id": "b",
+            "text": "Chutar o número do meio dos que ainda são possíveis"
+          },
+          {
+            "id": "d",
+            "text": "Descartar a metade em que ele não pode estar"
+          },
+          {
+            "id": "a",
+            "text": "Considerar possíveis todos os números de 1 a 100"
+          },
+          {
+            "id": "c",
+            "text": "Ouvir se o número secreto é maior ou menor"
+          },
+          {
+            "id": "e",
+            "text": "Repetir a partir do chute até acertar"
+          }
+        ],
+        "solution": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ]
+      },
+      "explanation": "A cada rodada, metade dos números possíveis é descartada: 100, 50, 25, 13, 7, 4, 2, 1. Por isso 7 chutes bastam. Essa estratégia se chama busca binária e é usada por computadores para procurar dados em listas ordenadas."
+    }
+  ]
+}
