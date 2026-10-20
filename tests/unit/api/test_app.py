@@ -9,6 +9,7 @@ from app.services.exceptions import (
     NotFound,
     RateLimited,
     ServiceError,
+    ServiceUnavailable,
     Unauthorized,
     ValidationFailed,
 )
@@ -110,6 +111,18 @@ def test_T_API_ERR_06_wrong_method_uses_same_shape():
 
     assert response.status_code == 405
     assert response.json() == {"detail": "method_not_allowed", "message": "Método não permitido."}
+
+
+def test_T_API_ERR_07_service_unavailable_is_503():
+    error = ServiceUnavailable("ai_unavailable", "A IA não está disponível agora.")
+
+    response = build_client(error).get("/test/raise")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "ai_unavailable",
+        "message": "A IA não está disponível agora.",
+    }
 
 
 def test_T_CORS_01_only_frontend_origin_is_allowed():

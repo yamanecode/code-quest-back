@@ -9,6 +9,7 @@ from app.services.exceptions import (
     NotFound,
     RateLimited,
     ServiceError,
+    ServiceUnavailable,
     Unauthorized,
     ValidationFailed,
 )
@@ -20,6 +21,7 @@ STATUS_BY_ERROR: dict[type[ServiceError], int] = {
     Conflict: 409,
     ValidationFailed: 422,
     RateLimited: 429,
+    ServiceUnavailable: 503,
 }
 
 HTTP_ERRORS: dict[int, tuple[str, str]] = {

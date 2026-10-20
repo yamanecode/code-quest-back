@@ -2,12 +2,13 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import Classrooms, CurrentStudent, Gamification, Play, require_student
+from app.api.deps import AI, Classrooms, CurrentStudent, Gamification, Play, require_student
 from app.api.schemas.classrooms import ClassroomRefOut, JoinRequest, MyClassroomOut
 from app.api.schemas.gamification import RankingOut, RankingPeriodIn, RankingScopeIn
 from app.api.schemas.play import (
     ChallengeForStudentOut,
     DailyOut,
+    HintOut,
     MissionDetailOut,
     MissionsOut,
     ProfileOut,
@@ -72,6 +73,11 @@ def submit_answer(
     challenge_id: int, body: SubmissionIn, student: CurrentStudent, play: Play
 ) -> SubmissionOut:
     return SubmissionOut(**asdict(play.submit(student.id, challenge_id, body.answer)))
+
+
+@router.post("/challenges/{challenge_id}/hints")
+def request_hint(challenge_id: int, student: CurrentStudent, ai: AI) -> HintOut:
+    return HintOut(**asdict(ai.request_hint(student.id, challenge_id)))
 
 
 @router.get("/daily-challenge")

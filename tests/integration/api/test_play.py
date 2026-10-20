@@ -9,9 +9,7 @@ from app.domain.gamification import daily_pick
 from app.infra.db.models import Submission, UserBadge, XPEvent
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    CORRECT_ANSWER,
     NOON,
-    WRONG_ANSWER,
     add_member,
     first_solve,
     link,
@@ -20,6 +18,7 @@ from tests.integration.factories import (
     make_mission,
     make_user,
 )
+from tests.samples import CORRECT_ANSWER, WRONG_ANSWER
 
 pytestmark = pytest.mark.usefixtures("badge_catalog")
 
@@ -164,6 +163,8 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
             "options": last.content["options"],
         },
         "solved": False,
+        "hints_left": 5,
+        "cooldown_seconds_left": 0,
     }
 
 
@@ -187,6 +188,7 @@ def test_T_STU_CHAL_NOSOL_no_solution_in_any_student_response(
         client.get(f"/api/missions/{mission.id}", headers=headers),
         client.get(f"/api/challenges/{challenge.id}", headers=headers),
         client.get("/api/daily-challenge", headers=headers),
+        client.post(f"/api/challenges/{challenge.id}/hints", headers=headers),
         miss(client, headers, challenge),
     ]
 

@@ -9,6 +9,8 @@ MISSION_DESCRIPTION_MAX = 400
 JOIN_CODE_LENGTH = 6
 JOIN_CODE_ALPHABET = string.ascii_uppercase + string.digits
 COPY_SUFFIX = " (cópia)"
+DRAFT_TOPIC_MIN = 3
+DRAFT_TOPIC_MAX = 200
 
 
 def _text_ok(value: object, high: int) -> bool:
@@ -47,3 +49,9 @@ def mission_errors(title: object, description: object) -> list[str]:
 def copy_title(title: str) -> str:
     """Title of a duplicated challenge; the original is shortened so the suffix always fits."""
     return title[: TITLE_MAX - len(COPY_SUFFIX)] + COPY_SUFFIX
+
+
+def draft_topic_errors(topic: object) -> list[str]:
+    if not isinstance(topic, str) or not DRAFT_TOPIC_MIN <= len(topic.strip()) <= DRAFT_TOPIC_MAX:
+        return [f"O tema deve ter de {DRAFT_TOPIC_MIN} a {DRAFT_TOPIC_MAX} caracteres."]
+    return []

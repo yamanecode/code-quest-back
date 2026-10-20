@@ -7,9 +7,7 @@ from app.domain.challenge_types import ChallengeType
 from app.domain.enums import HintSource, Role
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    CORRECT_ANSWER,
     NOON,
-    WRONG_ANSWER,
     add_member,
     hint,
     make_challenge,
@@ -17,6 +15,7 @@ from tests.integration.factories import (
     make_mission,
     make_user,
 )
+from tests.samples import CORRECT_ANSWER, WRONG_ANSWER
 
 pytestmark = pytest.mark.usefixtures("badge_catalog")
 

@@ -5,6 +5,7 @@ from app.domain.content import (
     JOIN_CODE_LENGTH,
     classroom_errors,
     copy_title,
+    draft_topic_errors,
     mission_errors,
 )
 
@@ -71,3 +72,13 @@ def test_T_DOM_CONTENT_04_copy_title_keeps_suffix_for_long_titles():
 def test_T_DOM_CONTENT_04_join_code_alphabet_is_uppercase_letters_and_digits():
     assert JOIN_CODE_LENGTH == 6
     assert set(JOIN_CODE_ALPHABET) == set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+
+@pytest.mark.parametrize("topic", ["abc", "  frutas  ", "a" * 200])
+def test_T_DOM_TOPIC_01_draft_topic_accepted(topic):
+    assert draft_topic_errors(topic) == []
+
+
+@pytest.mark.parametrize("topic", ["ab", "   ab   ", "a" * 201, None, 5])
+def test_T_DOM_TOPIC_01_draft_topic_rejected(topic):
+    assert draft_topic_errors(topic) == ["O tema deve ter de 3 a 200 caracteres."]

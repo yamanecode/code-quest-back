@@ -50,3 +50,8 @@ class RateLimited(ServiceError):
     ) -> None:
         super().__init__(code, message)
         self.retry_after = retry_after
+
+
+class ServiceUnavailable(ServiceError):
+    default_code = "unavailable"
+    default_message = "Serviço indisponível no momento. Tente de novo mais tarde."

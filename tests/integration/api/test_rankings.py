@@ -6,7 +6,6 @@ from app.core.clock import TIMEZONE
 from app.domain.enums import Role
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    CORRECT_ANSWER,
     NOON,
     add_member,
     first_solve,
@@ -15,6 +14,7 @@ from tests.integration.factories import (
     make_mission,
     make_user,
 )
+from tests.samples import CORRECT_ANSWER
 
 pytestmark = pytest.mark.usefixtures("badge_catalog")
 

@@ -13,6 +13,7 @@ from app.infra.repositories.daily import DailyRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
+from app.services.ai_service import AIService
 from app.services.classroom_service import ClassroomService
 from app.services.exceptions import NotFound, ValidationFailed
 from app.services.gamification_service import BadgeInfo, GamificationService
@@ -68,6 +69,8 @@ class StudentChallenge:
     skill: str
     content: dict
     solved: bool
+    hints_left: int
+    cooldown_seconds_left: int
 
 
 @dataclass(frozen=True)
@@ -108,11 +111,13 @@ class PlayService:
         clock: Clock,
         gamification: GamificationService,
         goals: ClassroomService,
+        ai: AIService,
     ) -> None:
         self.session = session
         self.clock = clock
         self.gamification = gamification
         self.goals = goals
+        self.ai = ai
         self.missions = MissionRepository(session)
         self.challenges = ChallengeRepository(session)
         self.classrooms = ClassroomRepository(session)
@@ -157,6 +162,7 @@ class PlayService:
     def get_challenge(self, user_id: int, challenge_id: int) -> StudentChallenge:
         challenge = self._visible_challenge(user_id, challenge_id)
         view = to_student_view(challenge.type, challenge.content, seed=f"{challenge.id}:{user_id}")
+        hints = self.ai.hint_status(user_id, challenge_id)
         return StudentChallenge(
             id=challenge.id,
             title=challenge.title,
@@ -165,6 +171,8 @@ class PlayService:
             skill=view["skill"],
             content=view["content"],
             solved=challenge.id in self.submissions.solved_challenge_ids(user_id),
+            hints_left=hints.hints_left,
+            cooldown_seconds_left=hints.cooldown_seconds_left,
         )
 
     def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
@@ -185,6 +193,9 @@ class PlayService:
             xp_earned = xp_for_wrong_attempts(wrong)
             self.xp.add(user_id, challenge_id, xp_earned, now)
         new_badges = []
+        hint = None
+        if not is_correct:
+            hint = self.ai.hint_after_wrong(user_id, challenge, answer)
         if is_correct:
             # Goal rewards first, so a class_goal badge is among the submitter's new badges.
             self.goals.reward_completed_goals(user_id, challenge_id)
@@ -202,7 +213,7 @@ class PlayService:
             level_up=after.level > before.level,
             new_badges=new_badges,
             explanation=explanation,
-            hint=None,
+            hint=hint,
         )
 
     def daily_challenge(self, user_id: int) -> DailyChallenge:

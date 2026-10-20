@@ -8,12 +8,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock
+from app.api.deps import get_clock, get_llm_client
 from app.core.clock import FixedClock
 from app.core.config import get_settings
 from app.domain.badges import BADGES
 from app.infra.db.models import Base
 from app.infra.db.session import get_session
+from app.infra.llm.fake import FakeLLMClient
 from app.infra.repositories.badges import BadgeRepository
 from app.main import create_app
 from tests.integration.factories import NOON
@@ -55,9 +56,16 @@ def clock() -> FixedClock:
 
 
 @pytest.fixture
-def client(session: Session, clock: FixedClock) -> Iterator[TestClient]:
+def llm() -> FakeLLMClient:
+    """Scripted model: tests add replies to `llm.replies`; with none left it fails."""
+    return FakeLLMClient(replies=[])
+
+
+@pytest.fixture
+def client(session: Session, clock: FixedClock, llm: FakeLLMClient) -> Iterator[TestClient]:
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_clock] = lambda: clock
+    app.dependency_overrides[get_llm_client] = lambda: llm
     with TestClient(app) as test_client:
         yield test_client

@@ -8,6 +8,7 @@ from app.domain.challenge_types import (
     ChallengeType,
     assign_item_ids,
     structure_changed,
+    template_rules,
     to_student_view,
     validate_challenge,
     validate_content,
@@ -402,3 +403,28 @@ def test_T_DOM_VIEW_04_other_types_keep_the_stored_order_and_input_is_not_mutate
 def test_T_DOM_VIEW_04_unknown_type_is_rejected():
     with pytest.raises(ValueError):
         to_student_view("drawing", ordering(), "1:1")
+
+
+@pytest.mark.parametrize(
+    ("challenge_type", "expected"),
+    [
+        (ChallengeType.ORDERING, ["De 3 a 8 itens."]),
+        (ChallengeType.GROUPING, ["De 2 a 4 etapas.", "De 4 a 10 itens."]),
+        (
+            ChallengeType.FILTERING,
+            ["Pergunta com 10 a 200 caracteres.", "De 4 a 10 itens."],
+        ),
+        (
+            ChallengeType.PATTERN,
+            ["Sequência de 3 a 8 termos, cada um com 1 a 40 caracteres.", "De 4 a 5 opções."],
+        ),
+    ],
+)
+def test_T_DOM_RULES_15_template_rules_text_per_type(challenge_type, expected):
+    rules = template_rules(challenge_type)
+
+    assert set(expected) <= set(rules)
+    assert "Título com 1 a 80 caracteres." in rules
+    assert "Enunciado com 20 a 600 caracteres." in rules
+    assert "Explicação opcional com no máximo 400 caracteres." in rules
+    assert any("solução" in rule for rule in rules)

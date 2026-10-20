@@ -95,7 +95,7 @@ class ChallengeView:
     solve_stats: SolveStatsView
 
 
-def _rule_errors(draft: ChallengeDraft) -> list[str]:
+def rule_errors(draft: ChallengeDraft) -> list[str]:
     field_errors = validate_challenge(draft.title, draft.statement, draft.explanation)
     return field_errors + validate_content(draft.type, draft.content)
 
@@ -266,8 +266,17 @@ class ContentService:
     def list_challenges(self, professor_id: int) -> list[ChallengeView]:
         return [self._challenge_view(c) for c in self.challenges.list_by_owner(professor_id)]
 
-    def create_challenge(self, professor_id: int, draft: ChallengeDraft) -> ChallengeView:
-        _check(_rule_errors(draft))
+    def create_challenge(
+        self,
+        professor_id: int,
+        draft: ChallengeDraft,
+        origin: Origin = Origin.PROFESSOR,
+        mission_id: int | None = None,
+    ) -> ChallengeView:
+        """Save a new draft challenge; with `mission_id` it is also added at the mission's end."""
+        _check(rule_errors(draft))
+        if mission_id is not None:
+            self._own_mission(professor_id, mission_id)
         challenge = self.challenges.add(
             owner_id=professor_id,
             title=draft.title,
@@ -275,8 +284,11 @@ class ContentService:
             challenge_type=ChallengeType(draft.type),
             content=draft.content,
             explanation=draft.explanation,
-            origin=Origin.PROFESSOR,
+            origin=origin,
         )
+        if mission_id is not None:
+            ids = self.missions.challenge_ids(mission_id)
+            self.missions.set_challenges(mission_id, [*ids, challenge.id])
         self.session.commit()
         return self._challenge_view(challenge)
 
@@ -288,7 +300,7 @@ class ContentService:
     ) -> ChallengeView:
         challenge = self._own_challenge(professor_id, challenge_id)
         # Rules first: structure_changed expects well-formed content.
-        _check(_rule_errors(draft))
+        _check(rule_errors(draft))
         if self.challenges.has_submissions(challenge_id) and (
             draft.type != challenge.type
             or structure_changed(draft.type, challenge.content, draft.content)
@@ -331,7 +343,7 @@ class ContentService:
 
     def publish_challenge(self, professor_id: int, challenge_id: int) -> ChallengeView:
         challenge = self._own_challenge(professor_id, challenge_id)
-        _check(_rule_errors(_draft_of(challenge)))
+        _check(rule_errors(_draft_of(challenge)))
         return self._set_challenge_status(challenge, ContentStatus.PUBLISHED)
 
     def unpublish_challenge(self, professor_id: int, challenge_id: int) -> ChallengeView:

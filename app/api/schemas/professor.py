@@ -86,3 +86,16 @@ class ChallengeOut(BaseModel):
     origin: str
     locked: bool
     solve_stats: SolveStatsOut
+
+
+class ReviewOut(BaseModel):
+    rule_violations: list[str]
+    suggestions: str
+
+
+class DraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: str
+    topic: str
+    mission_id: int | None = None

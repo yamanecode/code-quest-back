@@ -6,12 +6,12 @@ from app.domain.enums import Role
 from app.infra.security import create_token
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    CORRECT_ANSWER,
     make_challenge,
     make_classroom,
     make_mission,
     make_user,
 )
+from tests.samples import CORRECT_ANSWER
 
 PROFESSOR_ROUTE = "/api/professor/classrooms"
 

@@ -8,13 +8,13 @@ from app.domain.enums import Role
 from app.infra.db.models import Challenge
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    CONTENT,
     make_challenge,
     make_classroom,
     make_mission,
     make_user,
     submit,
 )
+from tests.samples import CONTENT
 
 URL = "/api/professor/challenges"
 STATEMENT = "Coloque os passos na ordem certa para resolver o problema."

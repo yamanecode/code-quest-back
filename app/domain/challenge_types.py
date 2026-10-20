@@ -40,6 +40,14 @@ QUESTION_MIN = 10
 QUESTION_MAX = 200
 TERM_MAX = 40
 
+# (minimum, maximum) number of elements per type.
+ORDERING_ITEMS = (3, 8)
+GROUPING_GROUPS = (2, 4)
+GROUPING_ITEMS = (4, 10)
+FILTERING_ITEMS = (4, 10)
+PATTERN_TERMS = (3, 8)
+PATTERN_OPTIONS = (4, 5)
+
 # (key in content, plural noun, "of the" phrase) used in PT-BR messages.
 ITEMS = ("items", "itens", "dos itens")
 GROUPS = ("groups", "etapas", "das etapas")
@@ -97,7 +105,7 @@ def _check_unique_texts(elements: list[dict], errors: list[str]) -> None:
 
 def _validate_ordering(content: dict) -> list[str]:
     errors: list[str] = []
-    items = _check_elements(content, ITEMS, 3, 8, errors)
+    items = _check_elements(content, ITEMS, *ORDERING_ITEMS, errors)
     _check_unique_texts(items, errors)
     solution = content.get("solution")
     if not _is_text_list(solution) or Counter(solution) != Counter(_ids(items)):
@@ -107,8 +115,8 @@ def _validate_ordering(content: dict) -> list[str]:
 
 def _validate_grouping(content: dict) -> list[str]:
     errors: list[str] = []
-    groups = _check_elements(content, GROUPS, 2, 4, errors)
-    items = _check_elements(content, ITEMS, 4, 10, errors)
+    groups = _check_elements(content, GROUPS, *GROUPING_GROUPS, errors)
+    items = _check_elements(content, ITEMS, *GROUPING_ITEMS, errors)
     _check_unique_texts(groups + items, errors)
     solution = content.get("solution")
     group_ids = set(_ids(groups))
@@ -128,7 +136,7 @@ def _validate_filtering(content: dict) -> list[str]:
     errors: list[str] = []
     if not _text_ok(content.get("question"), QUESTION_MIN, QUESTION_MAX):
         errors.append(f"A pergunta deve ter de {QUESTION_MIN} a {QUESTION_MAX} caracteres.")
-    items = _check_elements(content, ITEMS, 4, 10, errors)
+    items = _check_elements(content, ITEMS, *FILTERING_ITEMS, errors)
     _check_unique_texts(items, errors)
     solution = content.get("solution")
     item_ids = set(_ids(items))
@@ -146,11 +154,12 @@ def _validate_filtering(content: dict) -> list[str]:
 def _validate_pattern(content: dict) -> list[str]:
     errors: list[str] = []
     sequence = content.get("sequence")
-    if not isinstance(sequence, list) or not 3 <= len(sequence) <= 8:
-        errors.append("A sequência deve ter de 3 a 8 termos.")
+    low, high = PATTERN_TERMS
+    if not isinstance(sequence, list) or not low <= len(sequence) <= high:
+        errors.append(f"A sequência deve ter de {low} a {high} termos.")
     elif not all(_text_ok(term, 1, TERM_MAX) for term in sequence):
         errors.append(f"Cada termo da sequência deve ter de 1 a {TERM_MAX} caracteres.")
-    options = _check_elements(content, OPTIONS, 4, 5, errors)
+    options = _check_elements(content, OPTIONS, *PATTERN_OPTIONS, errors)
     _check_unique_texts(options, errors)
     solution = content.get("solution")
     if not isinstance(solution, str) or solution not in _ids(options):
@@ -173,6 +182,46 @@ def validate_content(challenge_type: str, content: object) -> list[str]:
     if not isinstance(content, dict):
         return ["O conteúdo do desafio está em formato inválido."]
     return validator(content)
+
+
+def _count_rule(limits: tuple[int, int], noun: str) -> str:
+    return f"De {limits[0]} a {limits[1]} {noun}."
+
+
+_COMMON_RULES = [
+    f"Título com 1 a {TITLE_MAX} caracteres.",
+    f"Enunciado com {STATEMENT_MIN} a {STATEMENT_MAX} caracteres.",
+    f"Explicação opcional com no máximo {EXPLANATION_MAX} caracteres.",
+    f"Cada texto de item, etapa ou opção com 1 a {TEXT_MAX} caracteres, sem textos repetidos.",
+]
+
+_TYPE_RULES = {
+    ChallengeType.ORDERING: [
+        _count_rule(ORDERING_ITEMS, "itens"),
+        "A solução é a ordem correta de todos os itens, cada um uma única vez.",
+    ],
+    ChallengeType.GROUPING: [
+        _count_rule(GROUPING_GROUPS, "etapas"),
+        _count_rule(GROUPING_ITEMS, "itens"),
+        "A solução coloca cada item em uma etapa, e toda etapa recebe pelo menos um item.",
+    ],
+    ChallengeType.FILTERING: [
+        f"Pergunta com {QUESTION_MIN} a {QUESTION_MAX} caracteres.",
+        _count_rule(FILTERING_ITEMS, "itens"),
+        "A solução lista os itens relevantes: pelo menos um relevante e um irrelevante.",
+    ],
+    ChallengeType.PATTERN: [
+        f"Sequência de {PATTERN_TERMS[0]} a {PATTERN_TERMS[1]} termos, "
+        f"cada um com 1 a {TERM_MAX} caracteres.",
+        _count_rule(PATTERN_OPTIONS, "opções"),
+        "A solução é o id da única opção correta.",
+    ],
+}
+
+
+def template_rules(challenge_type: str) -> list[str]:
+    """The template rules of spec 4.1 as PT-BR sentences, for AI prompts."""
+    return _COMMON_RULES + _TYPE_RULES[ChallengeType(challenge_type)]
 
 
 def _letter_id(position: int) -> str:

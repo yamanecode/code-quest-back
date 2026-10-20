@@ -2,17 +2,19 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import Content, CurrentProfessor, Gamification, require_professor
+from app.api.deps import AI, Content, CurrentProfessor, Gamification, require_professor
 from app.api.schemas.gamification import ClassroomProgressOut, RankingOut, RankingPeriodIn
 from app.api.schemas.professor import (
     ChallengeIn,
     ChallengeOut,
     ClassroomIn,
     ClassroomOut,
+    DraftIn,
     MissionChallengesIn,
     MissionIn,
     MissionOut,
     MissionUpdate,
+    ReviewOut,
 )
 from app.services.content_service import ChallengeDraft
 
@@ -135,6 +137,17 @@ def create_challenge(
 ) -> ChallengeOut:
     challenge = content.create_challenge(professor.id, ChallengeDraft(**body.model_dump()))
     return ChallengeOut(**asdict(challenge))
+
+
+@router.post("/challenges/ai-draft", status_code=201)
+def ai_draft(body: DraftIn, professor: CurrentProfessor, ai: AI) -> ChallengeOut:
+    challenge = ai.draft(professor.id, body.type, body.topic, body.mission_id)
+    return ChallengeOut(**asdict(challenge))
+
+
+@router.post("/challenges/{challenge_id}/ai-review")
+def ai_review(challenge_id: int, professor: CurrentProfessor, ai: AI) -> ReviewOut:
+    return ReviewOut(**asdict(ai.review(professor.id, challenge_id)))
 
 
 @router.get("/challenges/{challenge_id}")
