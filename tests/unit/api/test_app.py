@@ -134,3 +134,21 @@ def test_T_CORS_01_only_frontend_origin_is_allowed():
 
     assert allowed.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_T_API_ERR_08_unexpected_errors_use_the_same_shape_without_details():
+    app = create_app()
+
+    @app.get("/test/crash")
+    def crash():
+        raise RuntimeError("database password is s3cret")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/test/crash")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "internal_error",
+        "message": "Ocorreu um erro inesperado. Tente de novo.",
+    }
+    assert "s3cret" not in response.text

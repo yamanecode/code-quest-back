@@ -98,7 +98,8 @@ def _texts(elements: list[dict]) -> dict[str, str]:
 
 
 def _listing(title: str, elements: list[dict]) -> list[str]:
-    return [f"{title}:"] + [f"- {e['id']}: {e['text']}" for e in elements]
+    # Texts only: students see per-student ids, so a stored id in a hint would mislead.
+    return [f"{title}:"] + [f"- {e['text']}" for e in elements]
 
 
 def render_content(challenge_type: str, content: dict) -> str:

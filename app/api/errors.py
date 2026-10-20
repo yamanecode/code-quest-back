@@ -61,7 +61,14 @@ async def handle_http_error(request: Request, exc: StarletteHTTPException) -> JS
     return JSONResponse(error_body(code, message), status_code=exc.status_code)
 
 
+async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    # The server still logs the traceback; the client never sees internal details.
+    body = error_body("internal_error", "Ocorreu um erro inesperado. Tente de novo.")
+    return JSONResponse(body, status_code=500)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ServiceError, handle_service_error)
     app.add_exception_handler(RequestValidationError, handle_request_validation)
     app.add_exception_handler(StarletteHTTPException, handle_http_error)
+    app.add_exception_handler(Exception, handle_unexpected_error)

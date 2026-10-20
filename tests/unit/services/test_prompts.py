@@ -159,3 +159,21 @@ def test_T_AI_PROMPT_05c_draft_prompt_without_examples_and_with_previous_errors(
     assert "Exemplos" not in prompt.user
     assert "corrija" in prompt.user
     assert "- Faltou a opção correta." in prompt.user
+
+
+@pytest.mark.parametrize("challenge_type", list(ChallengeType))
+def test_T_AI_PROMPT_06_elements_are_listed_by_text_without_their_stored_ids(challenge_type):
+    # Students see per-student ids, so a hint that named a stored id would point elsewhere.
+    content = CONTENT[challenge_type]
+    elements = [e for key in ("items", "groups", "options") for e in content.get(key, [])]
+    prompts = [
+        hint_prompt(challenge(challenge_type), 1, []),
+        hint_prompt(challenge(challenge_type), 1, [], WRONG_ANSWER[challenge_type]),
+        review_prompt(challenge(challenge_type)),
+    ]
+
+    for prompt in prompts:
+        lines = prompt.user.splitlines()
+        for element in elements:
+            assert f"- {element['text']}" in lines
+            assert f"- {element['id']}: {element['text']}" not in lines

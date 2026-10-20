@@ -2,9 +2,9 @@
 
 from fastapi.testclient import TestClient
 
+from app.domain.challenge_types import SHUFFLED_TYPES
+from app.domain.grading import ANSWER_KEYS
 from app.infra.db.models import Challenge
-
-ANSWER_KEYS = {"ordering": "order", "grouping": "assignment", "filtering": "selected"}
 
 
 def as_student(client: TestClient, headers: dict, challenge: Challenge, answer: object) -> object:
@@ -13,8 +13,8 @@ def as_student(client: TestClient, headers: dict, challenge: Challenge, answer: 
     Items are matched by their (unique) text. Anything that is not a well-formed answer of a
     shuffled type, or a challenge the student cannot open, is returned unchanged.
     """
-    key = ANSWER_KEYS.get(challenge.type)
-    if key is None or not isinstance(answer, dict) or set(answer) != {key}:
+    key = ANSWER_KEYS[challenge.type]
+    if challenge.type not in SHUFFLED_TYPES or not isinstance(answer, dict) or set(answer) != {key}:
         return answer
     response = client.get(f"/api/challenges/{challenge.id}", headers=headers)
     if response.status_code != 200:
