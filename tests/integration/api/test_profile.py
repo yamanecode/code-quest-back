@@ -5,6 +5,7 @@ import pytest
 from app.domain.badges import BADGES
 from app.domain.challenge_types import ChallengeType
 from app.domain.enums import HintSource, Role
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     NOON,
@@ -31,7 +32,7 @@ def headers(student, clock):
 
 
 def send(client, headers, challenge, answers):
-    payload = {"answer": answers[challenge.type]}
+    payload = {"answer": as_student(client, headers, challenge, answers[challenge.type])}
     url = f"/api/challenges/{challenge.id}/submissions"
     return client.post(url, json=payload, headers=headers).json()
 

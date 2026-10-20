@@ -9,6 +9,7 @@ from app.domain.enums import ContentStatus, HintSource, Role
 from app.domain.hint_leak import hint_reveals_solution
 from app.infra.db.models import HintEvent
 from app.services.ai_service import FALLBACK_HINTS, NEUTRAL_HINT
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     make_challenge,
@@ -49,7 +50,9 @@ def view(client, headers, challenge) -> dict:
 
 def submit(client, headers, challenge, answer):
     url = f"/api/challenges/{challenge.id}/submissions"
-    return client.post(url, json={"answer": answer}, headers=headers)
+    return client.post(
+        url, json={"answer": as_student(client, headers, challenge, answer)}, headers=headers
+    )
 
 
 def hint_events(session, student) -> list[HintEvent]:

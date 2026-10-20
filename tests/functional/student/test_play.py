@@ -5,17 +5,20 @@ from tests.functional.helpers import (
     Account,
     LlmLog,
     assert_error,
+    base_challenge,
     base_files,
     correct_answer,
     create_challenge,
     fail,
     has_key,
+    item_texts,
     join,
     new_classroom,
     new_mission,
     profile,
     publish_mission,
     request_hint,
+    send,
     solve,
     submit,
     turma_with_mission,
@@ -117,8 +120,8 @@ def test_FT_STU_04_correct_and_wrong_answers_per_type(
     challenge = turma.challenges[0]
     join(student, turma.join_code)
 
-    wrong = submit(student, challenge["id"], wrong_answer(challenge_type, challenge["content"]))
-    right = submit(student, challenge["id"], correct_answer(challenge_type, challenge["content"]))
+    wrong = send(student, challenge, wrong_answer(challenge_type, challenge["content"]))
+    right = send(student, challenge, correct_answer(challenge_type, challenge["content"]))
 
     assert wrong.status_code == 200 and wrong.json()["is_correct"] is False
     assert right.status_code == 200 and right.json()["is_correct"] is True
@@ -262,8 +265,8 @@ def test_FT_STU_10_no_student_response_contains_the_solution(
         student.client.get(f"/api/challenges/{challenge['id']}"),
         student.client.get("/api/daily-challenge"),
         request_hint(student, challenge["id"]),
-        submit(student, challenge["id"], wrong_answer(challenge_type, content)),
-        submit(student, challenge["id"], correct_answer(challenge_type, content)),
+        send(student, challenge, wrong_answer(challenge_type, content)),
+        send(student, challenge, correct_answer(challenge_type, content)),
         student.client.get(f"/api/challenges/{challenge['id']}"),
     ]
 
@@ -273,9 +276,10 @@ def test_FT_STU_10_no_student_response_contains_the_solution(
     view = responses[2].json()
     assert view["skill"]
     if challenge_type == "ordering":
-        shown = [item["id"] for item in view["content"]["items"]]
-        assert sorted(shown) == sorted(content["solution"])
-        assert shown != content["solution"]
+        shown = view["content"]["items"]
+        texts = item_texts(content)
+        assert [item["id"] for item in shown] == ["a", "b", "c", "d", "e"]
+        assert [item["text"] for item in shown] != [texts[i] for i in content["solution"]]
 
 
 @pytest.mark.req("SG-08")
@@ -307,3 +311,37 @@ def test_FT_STU_12_new_class_mission_appears_after_publishing(professor: Account
 
     listed = missions(student)["classrooms"][0]["missions"]
     assert [m["id"] for m in listed] == [mission["id"]]
+
+
+@pytest.mark.req("SG-08")
+def test_FT_STU_13_item_ids_and_order_do_not_give_the_answer_away(new_student):
+    first, second = new_student(), new_student()
+    shuffled = {"ordering", "grouping", "filtering"}
+    orders_differ = False
+    real_answer_checked = False
+
+    for mission in missions(first)["base"]:
+        for summary in mission_detail(first, mission["id"])["challenges"]:
+            if summary["type"] not in shuffled:
+                continue
+            path = f"/api/challenges/{summary['id']}"
+            views = [student.client.get(path).json() for student in (first, second)]
+            for view in views:
+                ids = [item["id"] for item in view["content"]["items"]]
+                assert ids == [chr(ord("a") + i) for i in range(len(ids))], view["title"]
+            texts = [[item["text"] for item in view["content"]["items"]] for view in views]
+            orders_differ = orders_differ or texts[0] != texts[1]
+            if summary["type"] == "ordering":
+                shown = [item["id"] for item in views[0]["content"]["items"]]
+                shortcut = submit(first, summary["id"], {"order": sorted(shown)})
+                assert shortcut.json()["is_correct"] is False, views[0]["title"]
+                if not real_answer_checked:
+                    source = base_challenge(views[0]["title"], views[0]["statement"])
+                    content = source["content"]
+                    challenge = {"id": summary["id"], "type": "ordering", "content": content}
+                    real = send(first, challenge, correct_answer("ordering", content))
+                    assert real.json()["is_correct"] is True
+                    real_answer_checked = True
+
+    assert real_answer_checked
+    assert orders_differ

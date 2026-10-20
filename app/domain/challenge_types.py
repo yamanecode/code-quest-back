@@ -293,20 +293,40 @@ def structure_changed(challenge_type: str, old_content: dict, new_content: dict)
     return _structure(challenge_type, old_content) != _structure(challenge_type, new_content)
 
 
-def _shuffled(items: list[dict], solution: list[str], seed: str) -> list[dict]:
-    def sort_key(item: dict) -> str:
-        return hashlib.sha256(f"{seed}:{item['id']}".encode()).hexdigest()
+# Types whose items students see shuffled and renamed (spec 4.2).
+SHUFFLED_TYPES = (ChallengeType.ORDERING, ChallengeType.GROUPING, ChallengeType.FILTERING)
 
-    shuffled = sorted(items, key=sort_key)
-    if [item["id"] for item in shuffled] == solution:
+
+def _shuffled_ids(items: list[dict], solution: list[str] | None, seed: str) -> list[str]:
+    def sort_key(item_id: str) -> str:
+        return hashlib.sha256(f"{seed}:{item_id}".encode()).hexdigest()
+
+    shuffled = sorted((item["id"] for item in items), key=sort_key)
+    if shuffled == solution:
         shuffled = shuffled[1:] + shuffled[:1]
     return shuffled
 
 
+def student_ids(challenge_type: str, content: dict, seed: str) -> dict[str, str]:
+    """Stored item id -> the id this student sees, the letter of its displayed position.
+
+    Empty for types that are shown as stored. The order and the new ids depend only on
+    the seed, so neither reveals the solution.
+    """
+    challenge_type = ChallengeType(challenge_type)
+    if challenge_type not in SHUFFLED_TYPES:
+        return {}
+    solution = content["solution"] if challenge_type == ChallengeType.ORDERING else None
+    order = _shuffled_ids(content["items"], solution, seed)
+    return {item_id: _letter_id(position) for position, item_id in enumerate(order)}
+
+
 def to_student_view(challenge_type: str, content: dict, seed: str) -> dict:
-    """Content without the solution; ordering items in a per-student shuffled order."""
+    """Content without the solution; items shuffled and renamed per student (spec 4.2)."""
     challenge_type = ChallengeType(challenge_type)
     view = copy.deepcopy({key: value for key, value in content.items() if key != "solution"})
-    if challenge_type == ChallengeType.ORDERING:
-        view["items"] = _shuffled(view["items"], content["solution"], seed)
+    ids = student_ids(challenge_type, content, seed)
+    if ids:
+        by_id = {item["id"]: item for item in view["items"]}
+        view["items"] = [by_id[stored] | {"id": shown} for stored, shown in ids.items()]
     return {"type": challenge_type, "skill": SKILL_LABELS[challenge_type], "content": view}

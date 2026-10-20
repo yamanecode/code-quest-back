@@ -40,7 +40,7 @@ Each requirement has an ID, the implementation phase, the requirement and its ac
 | SG-05 | 7 | No AI draft reaches students without professor approval | An AI draft is not visible to students until the professor publishes it. |
 | SG-06 | 7 | No personal data in any request to the AI | No request sent to the AI contains the username, user id or class name, for every AI feature. |
 | SG-07 | 5 | XP only from solved challenges | Logging in, time passing, the streak, the daily challenge, the class goal, badges and hints never create XP. |
-| SG-08 | 5 | The student API never returns the solution | No student response contains a `solution` key at any depth, for every type; the explanation appears only after a correct answer. |
+| SG-08 | 5 | The student API never returns the solution | No student response contains a `solution` key at any depth, for every type; the explanation appears only after a correct answer; item ids are shown by position and the order differs per student, so the answer cannot be read from the ids or the order. |
 | SG-09 | 3 | Only username and password are collected; password stored as a hash | Sign-up accepts only username and password; no response contains the password or its hash. |
 | SG-10 | 6 | Rankings by period | The weekly rankings count XP from Monday 00:00 (São Paulo) and the monthly rankings from day 1; XP earned now appears in both. |
 | SG-11 | 5 | Game elements are not shown in isolation | MANUAL: inspect the student screens; badges always appear next to XP, level and title. |

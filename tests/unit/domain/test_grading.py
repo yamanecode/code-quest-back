@@ -1,7 +1,7 @@
 import pytest
 
-from app.domain.challenge_types import ChallengeType
-from app.domain.grading import InvalidAnswer, grade, validate_answer
+from app.domain.challenge_types import ChallengeType, student_ids
+from app.domain.grading import InvalidAnswer, answer_from_student, grade, validate_answer
 
 ORDERING = {
     "items": [{"id": "a", "text": "A"}, {"id": "b", "text": "B"}, {"id": "c", "text": "C"}],
@@ -93,3 +93,66 @@ def test_T_DOM_GRADE_09_malformed_answers_raise(challenge_type, content, answer)
 
 def test_T_DOM_GRADE_09_empty_filtering_selection_is_well_formed():
     validate_answer(ChallengeType.FILTERING, FILTERING, {"selected": []})
+
+
+def to_shown(challenge_type: str, content: dict, seed: str, answer: dict) -> dict:
+    """The stored-id answer rewritten with the ids this student sees."""
+    ids = student_ids(challenge_type, content, seed)
+    key, value = next(iter(answer.items()))
+    if isinstance(value, dict):
+        return {key: {ids[item]: group for item, group in value.items()}}
+    return {key: [ids[item] for item in value]}
+
+
+@pytest.mark.parametrize(
+    ("challenge_type", "content", "correct"),
+    [
+        (ChallengeType.ORDERING, ORDERING, {"order": ["c", "a", "b"]}),
+        (ChallengeType.GROUPING, GROUPING, {"assignment": {"a": "g1", "b": "g2"}}),
+        (ChallengeType.FILTERING, FILTERING, {"selected": ["a", "c"]}),
+    ],
+)
+def test_T_DOM_GRADE_10_student_ids_are_mapped_back_before_grading(
+    challenge_type, content, correct
+):
+    for seed in ("1:1", "1:2", "7:3"):
+        shown = to_shown(challenge_type, content, seed, correct)
+        assert answer_from_student(challenge_type, content, seed, shown) == correct
+        assert grade(
+            challenge_type, content, answer_from_student(challenge_type, content, seed, shown)
+        )
+
+
+@pytest.mark.parametrize(
+    ("challenge_type", "content", "answer"),
+    [
+        (ChallengeType.ORDERING, ORDERING, {"order": ["a", "b", "z"]}),
+        (ChallengeType.ORDERING, ORDERING, {"order": ["a", "b", 3]}),
+        (ChallengeType.GROUPING, GROUPING, {"assignment": {"a": "g1", "z": "g2"}}),
+        (ChallengeType.FILTERING, FILTERING, {"selected": ["z"]}),
+        (ChallengeType.FILTERING, FILTERING, {"selected": [None]}),
+    ],
+)
+def test_T_DOM_GRADE_11_an_id_the_student_was_not_shown_is_malformed(
+    challenge_type, content, answer
+):
+    with pytest.raises(InvalidAnswer):
+        answer_from_student(challenge_type, content, "1:1", answer)
+
+
+@pytest.mark.parametrize(
+    ("challenge_type", "content", "answer"),
+    [
+        (ChallengeType.ORDERING, ORDERING, ["a"]),
+        (ChallengeType.ORDERING, ORDERING, {"order": "abc"}),
+        (ChallengeType.ORDERING, ORDERING, {"order": ["a"], "extra": 1}),
+        (ChallengeType.GROUPING, GROUPING, {"assignment": ["g1"]}),
+        (ChallengeType.FILTERING, FILTERING, {"option": "a"}),
+        (ChallengeType.PATTERN, PATTERN, {"option": "a"}),
+        (ChallengeType.PATTERN, PATTERN, {"option": "z"}),
+    ],
+)
+def test_T_DOM_GRADE_12_wrong_shapes_and_pattern_answers_pass_through_unchanged(
+    challenge_type, content, answer
+):
+    assert answer_from_student(challenge_type, content, "1:1", answer) == answer

@@ -7,8 +7,8 @@ from tests.functional.helpers import (
     correct_answer,
     join,
     profile,
+    send,
     solve,
-    submit,
     turma_with_mission,
     unique,
 )
@@ -67,7 +67,8 @@ def test_FT_GAME_11_daily_challenge_is_unsolved_visible_and_stable_today(student
 
     view = student.client.get(f"/api/challenges/{challenge['id']}").json()
     source = base_challenge(view["title"], view["statement"])
-    response = submit(student, challenge["id"], correct_answer(view["type"], source["content"]))
+    base = {"id": challenge["id"], "type": view["type"], "content": source["content"]}
+    response = send(student, base, correct_answer(view["type"], source["content"]))
     assert response.json()["is_correct"] is True
 
     after = daily(student)

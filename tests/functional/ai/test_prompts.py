@@ -14,7 +14,7 @@ from tests.functional.helpers import (
     new_classroom,
     publish_mission,
     request_hint,
-    submit,
+    send,
     turma_with_mission,
     wait_cooldown,
     wrong_answer,
@@ -79,7 +79,7 @@ def test_FT_AI_10_hint_request_holds_statement_solution_level_and_instruction(
     request_hint(asking, challenge["id"])
     level_2 = only_prompt(llm_log, mark)
     mark = llm_log.mark()
-    submit(failing, challenge["id"], wrong_answer("ordering", content))
+    send(failing, challenge, wrong_answer("ordering", content))
     after_wrong = only_prompt(llm_log, mark)
 
     for prompt, level in ((level_1, 1), (level_2, 2), (after_wrong, 1)):
@@ -129,7 +129,7 @@ def test_FT_AI_13_no_personal_data_reaches_the_ai(professor: Account, new_studen
         hint_prompts.append(only_prompt(llm_log, mark))
         mark = llm_log.mark()
         answer = wrong_answer("grouping", wrong_challenge["content"])
-        assert submit(student, wrong_challenge["id"], answer).status_code == 200
+        assert send(student, wrong_challenge, answer).status_code == 200
         wrong_prompts.append(only_prompt(llm_log, mark))
     mark = llm_log.mark()
     review = professor.client.post(f"/api/professor/challenges/{hint_challenge['id']}/ai-review")
@@ -177,7 +177,7 @@ def test_FT_AI_15_application_keeps_working_when_the_ai_fails(professor: Account
     on_failure = request_hint(student, failing["id"])
     on_leak = request_hint(student, leaking["id"])
     review = professor.client.post(f"/api/professor/challenges/{failing['id']}/ai-review")
-    after_wrong = submit(student, failing["id"], wrong_answer("ordering", failing["content"]))
+    after_wrong = send(student, failing, wrong_answer("ordering", failing["content"]))
 
     assert on_failure.status_code == 200, on_failure.text
     fallback = on_failure.json()

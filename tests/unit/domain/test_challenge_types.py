@@ -8,6 +8,7 @@ from app.domain.challenge_types import (
     ChallengeType,
     assign_item_ids,
     structure_changed,
+    student_ids,
     template_rules,
     to_student_view,
     validate_challenge,
@@ -362,42 +363,102 @@ def test_T_DOM_VIEW_01_student_view_has_skill_and_no_solution():
         assert "solution" in content
 
 
-def test_T_DOM_VIEW_02_ordering_shuffle_is_deterministic_per_seed():
-    content = ordering(8)
-    first = to_student_view(ChallengeType.ORDERING, content, "10:7")
-    again = to_student_view(ChallengeType.ORDERING, content, "10:7")
-    assert first == again
-
-    orders = {
-        tuple(item["id"] for item in to_student_view("ordering", content, seed)["content"]["items"])
-        for seed in ("10:7", "10:8", "11:7")
-    }
-    assert len(orders) > 1
+def shown_texts(challenge_type: str, content: dict, seed: str) -> tuple[str, ...]:
+    view = to_student_view(challenge_type, content, seed)
+    return tuple(item["text"] for item in view["content"]["items"])
 
 
-def test_T_DOM_VIEW_03_ordering_view_is_a_permutation_never_equal_to_the_solution():
+def shown_answer(challenge_type: str, content: dict, seed: str) -> object:
+    """The correct answer written with the ids this student sees."""
+    ids = student_ids(challenge_type, content, seed)
+    solution = content["solution"]
+    if challenge_type == ChallengeType.GROUPING:
+        return {ids[item]: group for item, group in solution.items()}
+    return [ids[item] for item in solution]
+
+
+def test_T_DOM_VIEW_02_shuffle_is_deterministic_per_seed_and_varies_between_seeds():
+    for challenge_type, content in (
+        (ChallengeType.ORDERING, ordering(8)),
+        (ChallengeType.GROUPING, grouping(2, 8)),
+        (ChallengeType.FILTERING, filtering(8)),
+    ):
+        first = to_student_view(challenge_type, content, "10:7")
+        assert to_student_view(challenge_type, content, "10:7") == first
+        orders = {shown_texts(challenge_type, content, seed) for seed in ("10:7", "10:8", "11:7")}
+        assert len(orders) > 1, challenge_type
+
+
+def test_T_DOM_VIEW_03_ordering_shows_position_ids_and_never_the_solution_order():
     content = ordering(3)
+    texts = {item["id"]: item["text"] for item in content["items"]}
+    solution_texts = [texts[item] for item in content["solution"]]
     for user_id in range(200):
-        view = to_student_view(ChallengeType.ORDERING, content, f"5:{user_id}")
-        shown = [item["id"] for item in view["content"]["items"]]
-        assert sorted(shown) == ["a", "b", "c"]
-        assert shown != content["solution"]
-        assert all(item in content["items"] for item in view["content"]["items"])
+        seed = f"5:{user_id}"
+        view = to_student_view(ChallengeType.ORDERING, content, seed)
+        shown = view["content"]["items"]
+        assert [item["id"] for item in shown] == ["a", "b", "c"]
+        assert sorted(item["text"] for item in shown) == sorted(texts.values())
+        assert [item["text"] for item in shown] != solution_texts
+        assert shown_answer(ChallengeType.ORDERING, content, seed) != ["a", "b", "c"]
 
 
-def test_T_DOM_VIEW_04_other_types_keep_the_stored_order_and_input_is_not_mutated():
-    content = grouping()
+def test_T_DOM_VIEW_04_grouping_and_filtering_items_are_relabelled_by_position():
+    for challenge_type, content in (
+        (ChallengeType.GROUPING, grouping(2, 6)),
+        (ChallengeType.FILTERING, filtering(6)),
+    ):
+        original = copy.deepcopy(content)
+        view = to_student_view(challenge_type, content, "1:2")["content"]
+        assert [item["id"] for item in view["items"]] == ["a", "b", "c", "d", "e", "f"]
+        assert sorted(i["text"] for i in view["items"]) == sorted(
+            i["text"] for i in content["items"]
+        )
+        assert {key: value for key, value in view.items() if key != "items"} == {
+            key: value for key, value in content.items() if key not in ("items", "solution")
+        }
+        view["items"][0]["text"] = "changed"
+        assert content == original
+
+
+def test_T_DOM_VIEW_04_pattern_keeps_the_stored_options_and_input_is_not_mutated():
+    content = pattern()
     original = copy.deepcopy(content)
-    view = to_student_view(ChallengeType.GROUPING, content, "1:2")
-    assert view["content"] == {"groups": content["groups"], "items": content["items"]}
-
-    view["content"]["items"][0]["text"] = "changed"
+    view = to_student_view(ChallengeType.PATTERN, content, "1:2")
+    assert view["content"] == {"sequence": content["sequence"], "options": content["options"]}
+    assert student_ids(ChallengeType.PATTERN, content, "1:2") == {}
     assert content == original
 
     content = ordering()
     original = copy.deepcopy(content)
     to_student_view(ChallengeType.ORDERING, content, "1:2")
     assert content == original
+
+
+def test_T_DOM_VIEW_05_student_ids_give_every_stored_item_a_distinct_position_letter():
+    content = filtering(10)
+    ids = student_ids(ChallengeType.FILTERING, content, "3:4")
+    assert set(ids) == {item["id"] for item in content["items"]}
+    assert sorted(ids.values()) == [chr(ord("a") + i) for i in range(10)]
+    view = to_student_view(ChallengeType.FILTERING, content, "3:4")["content"]
+    texts = {item["id"]: item["text"] for item in content["items"]}
+    assert {item["text"]: item["id"] for item in view["items"]} == {
+        texts[stored]: shown for stored, shown in ids.items()
+    }
+
+
+def test_T_DOM_VIEW_06_sorted_ids_are_not_the_answer_when_stored_ids_follow_the_solution():
+    # The base-game pattern found by the audit: items stored shuffled, solution = sorted ids.
+    content = {
+        "items": [{"id": i, "text": f"Passo {i}"} for i in ("b", "d", "a", "e", "c")],
+        "solution": ["a", "b", "c", "d", "e"],
+    }
+    for user_id in range(200):
+        seed = f"9:{user_id}"
+        shown = [
+            item["id"] for item in to_student_view("ordering", content, seed)["content"]["items"]
+        ]
+        assert sorted(shown) != shown_answer(ChallengeType.ORDERING, content, seed)
 
 
 def test_T_DOM_VIEW_04_unknown_type_is_rejected():

@@ -8,6 +8,7 @@ from app.domain.challenge_types import ChallengeType
 from app.domain.enums import ContentStatus, Role
 from app.infra.db.models import Challenge, User
 from app.services.ai_service import FALLBACK_SUGGESTIONS
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     add_member,
@@ -286,7 +287,11 @@ def test_T_AI_PROMPT_03_no_prompt_carries_personal_data_or_turma_names(
 
     url = f"/api/challenges/{challenge.id}"
     client.post(
-        f"{url}/submissions", json={"answer": WRONG_ANSWER[challenge.type]}, headers=student_headers
+        f"{url}/submissions",
+        json={
+            "answer": as_student(client, student_headers, challenge, WRONG_ANSWER[challenge.type])
+        },
+        headers=student_headers,
     )
     client.post(f"{url}/hints", headers=student_headers)
     client.post(f"/api/professor/challenges/{challenge.id}/ai-review", headers=headers)

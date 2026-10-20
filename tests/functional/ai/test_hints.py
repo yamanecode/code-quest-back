@@ -8,8 +8,8 @@ from tests.functional.helpers import (
     item_texts,
     join,
     request_hint,
+    send,
     solve,
-    submit,
     turma_with_mission,
     wait_cooldown,
     wrong_answer,
@@ -111,9 +111,9 @@ def test_FT_AI_05_first_wrong_answer_brings_one_automatic_hint(
     texts = item_texts(challenge["content"])
     mark = llm_log.mark()
 
-    first = submit(student, challenge["id"], answer).json()
+    first = send(student, challenge, answer).json()
     view = challenge_view(student, challenge["id"])
-    later = [submit(student, challenge["id"], answer).json() for _ in range(2)]
+    later = [send(student, challenge, answer).json() for _ in range(2)]
     prompts = llm_log.since(mark)
 
     assert first["is_correct"] is False

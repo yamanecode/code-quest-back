@@ -1,11 +1,14 @@
+import hashlib
+import hmac
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
+from app.core.config import get_settings
 from app.domain.challenge_types import SKILL_LABELS, to_student_view
 from app.domain.gamification import daily_pick, xp_for_wrong_attempts
-from app.domain.grading import InvalidAnswer, grade
+from app.domain.grading import InvalidAnswer, answer_from_student, grade
 from app.infra.db.models import Challenge, Mission
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
@@ -92,6 +95,13 @@ class DailyChallenge:
     all_solved: bool
 
 
+def view_seed(challenge_id: int, user_id: int) -> str:
+    """Seed of a student's view of a challenge; keyed by a server secret so it can't be redone."""
+    key = get_settings().JWT_SECRET.encode()
+    message = f"student-view:{challenge_id}:{user_id}".encode()
+    return hmac.new(key, message, hashlib.sha256).hexdigest()
+
+
 def _summary(challenge: Challenge, solved_ids: set[int]) -> ChallengeSummary:
     return ChallengeSummary(
         challenge.id,
@@ -161,7 +171,7 @@ class PlayService:
 
     def get_challenge(self, user_id: int, challenge_id: int) -> StudentChallenge:
         challenge = self._visible_challenge(user_id, challenge_id)
-        view = to_student_view(challenge.type, challenge.content, seed=f"{challenge.id}:{user_id}")
+        view = to_student_view(challenge.type, challenge.content, view_seed(challenge.id, user_id))
         hints = self.ai.hint_status(user_id, challenge_id)
         return StudentChallenge(
             id=challenge.id,
@@ -177,7 +187,10 @@ class PlayService:
 
     def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
         challenge = self._visible_challenge(user_id, challenge_id)
+        seed = view_seed(challenge.id, user_id)
         try:
+            # From here on the answer uses stored ids: storage, grading and the hint prompt.
+            answer = answer_from_student(challenge.type, challenge.content, seed, answer)
             is_correct = grade(challenge.type, challenge.content, answer)
         except InvalidAnswer as error:
             raise ValidationFailed("invalid_answer", "Resposta em formato inválido.") from error

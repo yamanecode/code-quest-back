@@ -1,4 +1,4 @@
-from app.domain.challenge_types import ChallengeType
+from app.domain.challenge_types import ChallengeType, student_ids
 
 
 class InvalidAnswer(Exception):
@@ -28,6 +28,31 @@ def _ids(content: dict, key: str) -> set[str]:
 
 def _is_text_list(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(entry, str) for entry in value)
+
+
+def _stored_id(stored_by_shown: dict[str, str], shown: object) -> str:
+    if not isinstance(shown, str) or shown not in stored_by_shown:
+        raise InvalidAnswer("the answer uses an id the student was not shown")
+    return stored_by_shown[shown]
+
+
+def answer_from_student(challenge_type: str, content: dict, seed: str, answer: object) -> object:
+    """The answer with the ids the student saw turned back into stored ids (spec 4.2).
+
+    Wrong shapes are returned unchanged so that validate_answer reports them.
+    """
+    stored_by_shown = {
+        shown: stored for stored, shown in student_ids(challenge_type, content, seed).items()
+    }
+    key = ANSWER_KEYS[challenge_type]
+    if not stored_by_shown or not isinstance(answer, dict) or set(answer) != {key}:
+        return answer
+    value = answer[key]
+    if challenge_type == ChallengeType.GROUPING and isinstance(value, dict):
+        return {key: {_stored_id(stored_by_shown, item): group for item, group in value.items()}}
+    if challenge_type != ChallengeType.GROUPING and isinstance(value, list):
+        return {key: [_stored_id(stored_by_shown, item) for item in value]}
+    return answer
 
 
 def validate_answer(challenge_type: str, content: dict, answer: object) -> None:

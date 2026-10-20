@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.challenge_types import ChallengeType
+from app.domain.challenge_types import SHUFFLED_TYPES, ChallengeType, to_student_view
+from app.domain.grading import answer_from_student, grade
 from app.services.base_content_service import read_base_dir
 from app.services.exceptions import ValidationFailed
 
@@ -123,3 +124,28 @@ def test_T_BASE_04_repeated_mission_title_is_an_error(tmp_path):
 
 def test_T_BASE_04_directory_without_json_files_is_an_error(tmp_path):
     assert errors_of(tmp_path) == [f"Nenhum arquivo .json encontrado em {tmp_path}."]
+
+
+def test_T_BASE_05_base_answers_cannot_be_read_from_the_student_view():
+    # Audit finding: the stored ids and order of the base files give the answer away.
+    challenges = [
+        challenge
+        for mission in read_base_dir(BASE_DIR)
+        for challenge in mission.challenges
+        if challenge.type in SHUFFLED_TYPES
+    ]
+    assert len(challenges) == 21
+    for challenge in challenges:
+        orders = set()
+        for user_id in range(50):
+            seed = f"{user_id}:base"
+            items = to_student_view(challenge.type, challenge.content, seed)["content"]["items"]
+            shown = [item["id"] for item in items]
+            assert shown == [chr(ord("a") + i) for i in range(len(shown))]
+            orders.add(tuple(item["text"] for item in items))
+            if challenge.type == ChallengeType.ORDERING:
+                answer = answer_from_student(
+                    challenge.type, challenge.content, seed, {"order": shown}
+                )
+                assert not grade(challenge.type, challenge.content, answer), challenge.title
+        assert len(orders) > 1, challenge.title

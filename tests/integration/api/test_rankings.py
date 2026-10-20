@@ -4,6 +4,7 @@ import pytest
 
 from app.core.clock import TIMEZONE
 from app.domain.enums import Role
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     NOON,
@@ -58,8 +59,9 @@ def test_T_STU_RANK_01_xp_earned_now_appears_in_both_periods(client, session, cl
     ana = make_user(session, "ana")
     challenge = make_challenge(session, missions=(make_mission(session),))
     url = f"/api/challenges/{challenge.id}/submissions"
-    payload = {"answer": CORRECT_ANSWER[challenge.type]}
-    client.post(url, json=payload, headers=bearer(ana, clock))
+    headers = bearer(ana, clock)
+    payload = {"answer": as_student(client, headers, challenge, CORRECT_ANSWER[challenge.type])}
+    client.post(url, json=payload, headers=headers)
 
     for period in ("week", "month"):
         assert rows(ranking(client, clock, ana, period=period)) == [(1, "ana", 10)]

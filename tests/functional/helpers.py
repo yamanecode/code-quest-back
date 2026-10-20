@@ -298,19 +298,42 @@ def submit(student: Account, challenge_id: int, answer: dict) -> httpx.Response:
     )
 
 
+ANSWER_KEYS = {"ordering": "order", "grouping": "assignment", "filtering": "selected"}
+
+
+def as_student(student: Account, challenge: dict, answer: dict) -> dict:
+    """An answer written with the professor's item ids, rewritten with the ids this student sees.
+
+    Items are matched by their (unique) text in the student's challenge view, like a real
+    client does. Answers of other types are returned unchanged.
+    """
+    key = ANSWER_KEYS.get(challenge["type"])
+    if key is None or set(answer) != {key}:
+        return answer
+    view = student.client.get(f"/api/challenges/{challenge['id']}")
+    assert view.status_code == 200, view.text
+    shown_by_text = {item["text"]: item["id"] for item in view.json()["content"]["items"]}
+    shown = {item["id"]: shown_by_text[item["text"]] for item in challenge["content"]["items"]}
+    value = answer[key]
+    if isinstance(value, dict):
+        return {key: {shown[item]: group for item, group in value.items()}}
+    return {key: [shown[item] for item in value]}
+
+
+def send(student: Account, challenge: dict, answer: dict) -> httpx.Response:
+    """Submit an answer written with the professor's ids, as this student would send it."""
+    return submit(student, challenge["id"], as_student(student, challenge, answer))
+
+
 def solve(student: Account, challenge: dict) -> dict:
-    response = submit(
-        student, challenge["id"], correct_answer(challenge["type"], challenge["content"])
-    )
+    response = send(student, challenge, correct_answer(challenge["type"], challenge["content"]))
     assert response.status_code == 200, response.text
     assert response.json()["is_correct"] is True
     return response.json()
 
 
 def fail(student: Account, challenge: dict) -> dict:
-    response = submit(
-        student, challenge["id"], wrong_answer(challenge["type"], challenge["content"])
-    )
+    response = send(student, challenge, wrong_answer(challenge["type"], challenge["content"]))
     assert response.status_code == 200, response.text
     assert response.json()["is_correct"] is False
     return response.json()

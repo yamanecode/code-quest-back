@@ -7,6 +7,7 @@ from app.domain.challenge_types import SKILL_LABELS, ChallengeType
 from app.domain.enums import ContentStatus
 from app.domain.gamification import daily_pick
 from app.infra.db.models import Submission, UserBadge, XPEvent
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     NOON,
@@ -38,7 +39,9 @@ def headers(student, clock):
 
 def answer(client, headers, challenge, payload):
     return client.post(
-        f"/api/challenges/{challenge.id}/submissions", json={"answer": payload}, headers=headers
+        f"/api/challenges/{challenge.id}/submissions",
+        json={"answer": as_student(client, headers, challenge, payload)},
+        headers=headers,
     )
 
 
@@ -201,12 +204,72 @@ def test_T_STU_CHAL_NOSOL_no_solution_in_any_student_response(
 
 
 def test_T_STU_CHAL_NOSOL_ordering_items_are_not_sent_in_solution_order(client, session, headers):
+    # Sample content has the base-game shape: the solution is the stored ids in order.
     challenge = make_challenge(session, missions=(make_mission(session),))
+    texts = {item["id"]: item["text"] for item in challenge.content["items"]}
 
     content = client.get(f"/api/challenges/{challenge.id}", headers=headers).json()["content"]
 
-    assert [item["id"] for item in content["items"]] != challenge.content["solution"]
-    assert sorted(item["id"] for item in content["items"]) == ["a", "b", "c"]
+    assert [item["id"] for item in content["items"]] == ["a", "b", "c"]
+    assert [item["text"] for item in content["items"]] != [
+        texts[item] for item in challenge.content["solution"]
+    ]
+    shown_order = {"order": [item["id"] for item in content["items"]]}
+    response = client.post(
+        f"/api/challenges/{challenge.id}/submissions", json={"answer": shown_order}, headers=headers
+    )
+    assert response.json()["is_correct"] is False
+
+
+def eight_steps(session, challenge) -> None:
+    challenge.content = {
+        "items": [{"id": chr(ord("a") + i), "text": f"Passo {i + 1}"} for i in range(8)],
+        "solution": [chr(ord("a") + i) for i in range(8)],
+    }
+    session.flush()
+
+
+def test_T_STU_VIEW_01_students_see_their_own_order_of_the_items(client, session, clock):
+    challenge = make_challenge(session, missions=(make_mission(session),))
+    eight_steps(session, challenge)
+
+    orders = set()
+    for name in ("ana", "bia", "caio", "davi"):
+        headers = bearer(make_user(session, name), clock)
+        content = client.get(f"/api/challenges/{challenge.id}", headers=headers).json()["content"]
+        assert [item["id"] for item in content["items"]] == list("abcdefgh")
+        orders.add(tuple(item["text"] for item in content["items"]))
+        again = client.get(f"/api/challenges/{challenge.id}", headers=headers).json()["content"]
+        assert again == content
+
+    assert len(orders) > 1
+
+
+def test_T_STU_VIEW_02_an_id_the_student_was_not_shown_is_rejected(
+    client, session, headers, challenge
+):
+    response = client.post(
+        f"/api/challenges/{challenge.id}/submissions",
+        json={"answer": {"order": ["a", "b", "z"]}},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "invalid_answer"
+    assert session.scalar(select(func.count()).select_from(Submission)) == 0
+
+
+def test_T_STU_VIEW_03_submissions_are_stored_with_the_stored_ids(
+    client, session, student, headers, challenge
+):
+    eight_steps(session, challenge)
+
+    response = answer(client, headers, challenge, {"order": list("abcdefgh")})
+
+    assert response.json()["is_correct"] is True
+
+    stored = session.scalar(select(Submission).filter_by(user_id=student.id))
+    assert stored.answer == {"order": list("abcdefgh")}
 
 
 # Submissions

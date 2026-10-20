@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.domain.enums import ContentStatus, Role
 from app.infra.db.models import ClassGoalReward
+from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     NOON,
@@ -24,8 +25,9 @@ WEEK_START = "2026-10-12"  # Monday of NOON's week
 
 def solve(client, clock, user, challenge):
     url = f"/api/challenges/{challenge.id}/submissions"
-    payload = {"answer": CORRECT_ANSWER[challenge.type]}
-    response = client.post(url, json=payload, headers=bearer(user, clock))
+    headers = bearer(user, clock)
+    payload = {"answer": as_student(client, headers, challenge, CORRECT_ANSWER[challenge.type])}
+    response = client.post(url, json=payload, headers=headers)
     assert response.status_code == 200
     return response.json()
 
