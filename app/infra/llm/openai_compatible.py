@@ -10,11 +10,18 @@ class OpenAICompatibleClient:
     """Any provider that exposes the OpenAI chat-completions endpoint, hosted or local."""
 
     def __init__(
-        self, base_url: str, model: str, api_key: str, *, http: httpx.Client | None = None
+        self,
+        base_url: str,
+        model: str,
+        api_key: str,
+        reasoning_effort: str = "",
+        *,
+        http: httpx.Client | None = None,
     ) -> None:
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.model = model
         self.api_key = api_key
+        self.reasoning_effort = reasoning_effort
         self.http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> str:
@@ -27,6 +34,9 @@ class OpenAICompatibleClient:
             "max_tokens": max_tokens,
             "temperature": TEMPERATURE,
         }
+        # Reasoning models spend max_tokens on hidden thinking; "low" keeps room for the answer.
+        if self.reasoning_effort:
+            body["reasoning_effort"] = self.reasoning_effort
         headers = {"Authorization": f"Bearer {self.api_key}"}
         # Error messages name only the failure type: the prompt must never reach the logs.
         try:

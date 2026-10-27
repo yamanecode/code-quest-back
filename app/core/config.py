@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = ""
     LLM_MODEL: str = ""
     LLM_API_KEY: str = ""
+    LLM_REASONING_EFFORT: str = ""
     FAKE_LLM_LOG: str | None = None
     # Used only by the professor commands of app.cli; prompted when empty.
     CODEQUEST_PROFESSOR_PASSWORD: str | None = None

@@ -35,8 +35,8 @@ from app.services.prompts import (
 
 logger = logging.getLogger(__name__)
 
-HINT_MAX_TOKENS = 200
-REVIEW_MAX_TOKENS = 500
+HINT_MAX_TOKENS = 1000
+REVIEW_MAX_TOKENS = 1500
 DRAFT_MAX_TOKENS = 1200
 DRAFT_ATTEMPTS = 2
 

@@ -43,6 +43,22 @@ def test_T_AI_OPENAI_01_posts_chat_completion_and_returns_the_text():
     }
 
 
+def test_T_AI_OPENAI_01c_sends_reasoning_effort_only_when_configured():
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return chat_reply("ok")
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    with_effort = OpenAICompatibleClient("https://llm.example/v1", "m", "k", "low", http=http)
+    with_effort.complete("s", "u", max_tokens=10)
+    client_answering(handler).complete("s", "u", max_tokens=10)
+
+    assert bodies[0]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in bodies[1]
+
+
 def test_T_AI_OPENAI_01b_default_http_client_times_out_after_30_seconds():
     client = OpenAICompatibleClient("https://llm.example/v1", "m", "k")
 
