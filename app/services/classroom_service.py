@@ -29,11 +29,14 @@ class Goal:
 class MyClassroom:
     id: int
     name: str
+    closed: bool
     goal: Goal | None
 
 
 def class_goal(classrooms: ClassroomRepository, classroom: Classroom, now: datetime) -> Goal | None:
-    """This week's class goal (spec §5.3); None when the turma has nothing left to solve."""
+    """This week's class goal (spec §5.3); None when closed or nothing is left to solve."""
+    if classroom.closed:
+        return None
     start = week_start(now)
     target = goal_target(
         classroom.weekly_goal,
@@ -57,7 +60,8 @@ class ClassroomService:
 
     def join(self, user_id: int, join_code: str) -> ClassroomRef:
         classroom = self.classrooms.get_by_join_code(join_code.strip().upper())
-        if classroom is None:
+        # A closed turma answers like a wrong code, so its code reveals nothing.
+        if classroom is None or classroom.closed:
             raise NotFound("invalid_join_code", "Código de turma inválido.")
         if self.classrooms.get_membership(user_id, classroom.id) is None:
             self.classrooms.add_member(user_id, classroom.id)
@@ -75,7 +79,12 @@ class ClassroomService:
     def my_classrooms(self, user_id: int) -> list[MyClassroom]:
         now = self.clock.now()
         return [
-            MyClassroom(classroom.id, classroom.name, class_goal(self.classrooms, classroom, now))
+            MyClassroom(
+                classroom.id,
+                classroom.name,
+                classroom.closed,
+                class_goal(self.classrooms, classroom, now),
+            )
             for classroom in self.classrooms.member_classrooms(user_id)
         ]
 

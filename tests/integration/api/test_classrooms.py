@@ -41,7 +41,7 @@ def test_T_CLASS_01_join_with_valid_code(client, session, headers):
     assert response.status_code == 200
     assert response.json() == {"id": classroom.id, "name": classroom.name}
     listed = client.get("/api/classrooms", headers=headers).json()
-    assert listed == [{"id": classroom.id, "name": classroom.name, "goal": None}]
+    assert listed == [{"id": classroom.id, "name": classroom.name, "closed": False, "goal": None}]
 
 
 def test_T_CLASS_01_code_is_case_and_space_insensitive(client, session, headers):
@@ -119,3 +119,53 @@ def test_T_CLASS_06_leaving_a_classroom_you_are_not_in_is_404(client, session, h
     assert response.status_code == 404
     assert missing.status_code == 404
     assert session.scalar(select(func.count()).select_from(ClassroomMember)) == 1
+
+
+def test_T_CLASS_07_closed_code_answers_like_a_wrong_code(client, session, headers, student):
+    classroom = make_classroom(session, closed=True)
+
+    response = join(client, headers, classroom.join_code)
+    wrong = join(client, headers, "NOPE99")
+
+    assert response.status_code == 404
+    assert response.json() == wrong.json()
+    assert memberships(session, student) == 0
+
+
+def test_T_CLASS_07_members_keep_their_closed_turma_and_its_missions(
+    client, session, headers, student
+):
+    classroom = make_classroom(session)
+    mission = make_mission(session, classroom, title="Rotina")
+    make_challenge(session, missions=(mission,))
+    add_member(session, student, classroom)
+    classroom.closed = True
+    session.flush()
+
+    listed = client.get("/api/classrooms", headers=headers).json()
+    missions = client.get("/api/missions", headers=headers).json()
+
+    assert [item["id"] for item in listed] == [classroom.id]
+    assert [m["title"] for m in missions["classrooms"][0]["missions"]] == ["Rotina"]
+
+
+def test_T_CLASS_07_reopened_code_works_again(client, session, headers, student):
+    classroom = make_classroom(session, closed=True)
+    classroom.closed = False
+    session.flush()
+
+    assert join(client, headers, classroom.join_code).status_code == 200
+
+
+def test_T_CLASS_08_my_classrooms_tell_which_ones_are_closed(client, session, headers, student):
+    open_turma = make_classroom(session)
+    closed_turma = make_classroom(session, closed=True)
+    add_member(session, student, open_turma)
+    add_member(session, student, closed_turma)
+
+    listed = client.get("/api/classrooms", headers=headers).json()
+
+    assert {item["id"]: item["closed"] for item in listed} == {
+        open_turma.id: False,
+        closed_turma.id: True,
+    }

@@ -15,6 +15,7 @@ class ClassroomOut(BaseModel):
     name: str
     join_code: str
     weekly_goal: int | None
+    closed: bool
     goal: GoalOut | None
 
 
@@ -32,6 +33,12 @@ class MissionUpdate(BaseModel):
     title: str
     description: str | None = None
     position: int
+
+
+class MissionOrderIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mission_ids: list[int]
 
 
 class MissionChallengesIn(BaseModel):

@@ -57,6 +57,16 @@ class ClassroomRepository:
         )
         return self.session.scalar(query)
 
+    def get_membership_by_username(
+        self, classroom_id: int, username: str
+    ) -> ClassroomMember | None:
+        query = (
+            select(ClassroomMember)
+            .join(User, User.id == ClassroomMember.user_id)
+            .where(ClassroomMember.classroom_id == classroom_id, User.username == username)
+        )
+        return self.session.scalar(query)
+
     def remove_member(self, membership: ClassroomMember) -> None:
         self.session.delete(membership)
         self.session.flush()

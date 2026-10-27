@@ -5,7 +5,13 @@ from app.domain.challenge_types import ChallengeType
 from app.domain.enums import ContentStatus, Role
 from app.infra.db.models import Challenge, Mission
 from tests.integration.auth_helpers import bearer
-from tests.integration.factories import make_challenge, make_classroom, make_user, submit
+from tests.integration.factories import (
+    make_challenge,
+    make_classroom,
+    make_mission,
+    make_user,
+    submit,
+)
 
 DRAFT = ContentStatus.DRAFT
 
@@ -200,3 +206,75 @@ def test_T_PROF_08_mission_without_submissions_is_deleted(
     )
     session.expire_all()
     assert session.get(Challenge, challenge.id) is not None
+
+
+def order_url(classroom):
+    return f"/api/professor/classrooms/{classroom.id}/missions/order"
+
+
+def ids_in_order(client, headers, classroom):
+    listed = client.get(
+        f"/api/professor/classrooms/{classroom.id}/missions", headers=headers
+    ).json()
+    return [mission["id"] for mission in listed]
+
+
+def test_T_PROF_ORDER_01_sets_the_whole_order_and_renumbers_from_zero(client, headers, classroom):
+    first, second, third = (
+        create_mission(client, headers, classroom, title=name).json() for name in "ABC"
+    )
+    client.post(f"/api/professor/missions/{second['id']}/unpublish", headers=headers)
+    new_order = [third["id"], first["id"], second["id"]]
+
+    response = client.put(order_url(classroom), json={"mission_ids": new_order}, headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [m["id"] for m in body] == new_order
+    assert [m["position"] for m in body] == [0, 1, 2]
+    assert [m["status"] for m in body] == ["draft"] * 3
+    assert ids_in_order(client, headers, classroom) == new_order
+
+
+def test_T_PROF_ORDER_02_wrong_lists_are_rejected_and_change_nothing(
+    client, session, headers, classroom
+):
+    first, second = (create_mission(client, headers, classroom, title=n).json() for n in "AB")
+    other = make_mission(session, make_classroom(session))
+    before = ids_in_order(client, headers, classroom)
+    wrong_lists = [
+        [first["id"], first["id"]],  # repeated
+        [first["id"]],  # missing one
+        [second["id"], first["id"], other.id],  # a mission of another turma
+        [],  # the turma has missions, so none listed means missing ones
+    ]
+
+    for mission_ids in wrong_lists:
+        response = client.put(
+            order_url(classroom), json={"mission_ids": mission_ids}, headers=headers
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"] == "validation_error"
+
+    assert ids_in_order(client, headers, classroom) == before
+
+
+def test_T_PROF_ORDER_03_only_the_owner_can_reorder(client, session, clock, classroom):
+    mission = make_mission(session, classroom)
+    stranger = bearer(make_user(session, "prof_bia", role=Role.PROFESSOR), clock)
+
+    response = client.put(
+        order_url(classroom), json={"mission_ids": [mission.id]}, headers=stranger
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "classroom_not_found"
+
+
+def test_T_PROF_ORDER_04_a_turma_without_missions_accepts_the_empty_order(
+    client, headers, classroom
+):
+    response = client.put(order_url(classroom), json={"mission_ids": []}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == []

@@ -61,6 +61,7 @@ class Classroom(_Row):
     join_code: Mapped[str] = mapped_column(String(6), unique=True)
     professor_id: Mapped[int] = _user_fk()
     weekly_goal: Mapped[int | None] = mapped_column(Integer)
+    closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class ClassroomMember(_Row):

@@ -24,4 +24,5 @@ class GoalOut(BaseModel):
 class MyClassroomOut(BaseModel):
     id: int
     name: str
+    closed: bool
     goal: GoalOut | None

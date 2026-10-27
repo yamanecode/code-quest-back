@@ -12,6 +12,7 @@ from app.api.schemas.professor import (
     DraftIn,
     MissionChallengesIn,
     MissionIn,
+    MissionOrderIn,
     MissionOut,
     MissionUpdate,
     ReviewOut,
@@ -50,6 +51,35 @@ def update_classroom(
     return ClassroomOut(**asdict(classroom))
 
 
+@router.post("/classrooms/{classroom_id}/close")
+def close_classroom(
+    classroom_id: int, professor: CurrentProfessor, content: Content
+) -> ClassroomOut:
+    return ClassroomOut(**asdict(content.close_classroom(professor.id, classroom_id)))
+
+
+@router.post("/classrooms/{classroom_id}/reopen")
+def reopen_classroom(
+    classroom_id: int, professor: CurrentProfessor, content: Content
+) -> ClassroomOut:
+    return ClassroomOut(**asdict(content.reopen_classroom(professor.id, classroom_id)))
+
+
+@router.post("/classrooms/{classroom_id}/new-code")
+def renew_join_code(
+    classroom_id: int, professor: CurrentProfessor, content: Content
+) -> ClassroomOut:
+    return ClassroomOut(**asdict(content.renew_join_code(professor.id, classroom_id)))
+
+
+@router.delete("/classrooms/{classroom_id}/members/{username}", status_code=204)
+def remove_member(
+    classroom_id: int, username: str, professor: CurrentProfessor, content: Content
+) -> Response:
+    content.remove_member(professor.id, classroom_id, username)
+    return Response(status_code=204)
+
+
 @router.get("/classrooms/{classroom_id}/progress")
 def classroom_progress(
     classroom_id: int, professor: CurrentProfessor, gamification: Gamification
@@ -85,6 +115,14 @@ def create_mission(
         professor.id, classroom_id, body.title, body.description, body.position
     )
     return MissionOut(**asdict(mission))
+
+
+@router.put("/classrooms/{classroom_id}/missions/order")
+def set_mission_order(
+    classroom_id: int, body: MissionOrderIn, professor: CurrentProfessor, content: Content
+) -> list[MissionOut]:
+    missions = content.set_mission_order(professor.id, classroom_id, body.mission_ids)
+    return [MissionOut(**asdict(mission)) for mission in missions]
 
 
 @router.get("/missions/{mission_id}")

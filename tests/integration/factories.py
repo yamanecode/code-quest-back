@@ -40,13 +40,22 @@ def make_user(
 
 
 def make_classroom(
-    session: Session, professor: User | None = None, weekly_goal: int | None = None
+    session: Session,
+    professor: User | None = None,
+    weekly_goal: int | None = None,
+    closed: bool = False,
 ) -> Classroom:
     owner = professor or make_user(session, role=Role.PROFESSOR)
     code = f"C{next(_sequence):05d}"
     return _add(
         session,
-        Classroom(name="Turma", join_code=code, professor_id=owner.id, weekly_goal=weekly_goal),
+        Classroom(
+            name="Turma",
+            join_code=code,
+            professor_id=owner.id,
+            weekly_goal=weekly_goal,
+            closed=closed,
+        ),
     )
 
 

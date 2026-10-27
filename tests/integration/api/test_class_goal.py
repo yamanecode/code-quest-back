@@ -184,3 +184,22 @@ def test_T_STU_GOAL_08_draft_challenge_never_completes_a_goal(client, session, c
     assert goal_of(client, clock, ana, turma)["progress"] == 0
     solve(client, clock, ana, published)
     assert rewards(session, turma) == [ana.id]
+
+
+def test_T_STU_GOAL_05_a_closed_turma_has_no_goal_and_gives_no_rewards(client, session, clock):
+    ana, bia = make_user(session, "ana"), make_user(session, "bia")
+    turma, (first, second) = turma_with(session, [ana, bia], challenges=2, weekly_goal=1)
+    turma.closed = True
+    session.flush()
+
+    reached = solve(client, clock, ana, first)
+
+    assert goal_of(client, clock, ana, turma) is None
+    assert "class_goal_1" not in {badge["code"] for badge in reached["new_badges"]}
+    assert rewards(session, turma) == []
+
+    turma.closed = False
+    session.flush()
+    assert (
+        goal_of(client, clock, bia, turma)["progress"] == 1
+    )  # the solve still counts once reopened

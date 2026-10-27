@@ -41,6 +41,7 @@ class ClassroomView:
     name: str
     join_code: str
     weekly_goal: int | None
+    closed: bool
     goal: Goal | None
 
 
@@ -163,12 +164,43 @@ class ContentService:
         self.session.commit()
         return self._classroom_view(classroom)
 
+    def renew_join_code(self, professor_id: int, classroom_id: int) -> ClassroomView:
+        """Replace a leaked code: the old one stops working, members stay."""
+        classroom = self._own_classroom(professor_id, classroom_id)
+        classroom.join_code = self._free_join_code()
+        self.session.commit()
+        return self._classroom_view(classroom)
+
+    def remove_member(self, professor_id: int, classroom_id: int, username: str) -> None:
+        self._own_classroom(professor_id, classroom_id)
+        membership = self.classrooms.get_membership_by_username(
+            classroom_id, username.strip().lower()
+        )
+        if membership is None:
+            raise NotFound("member_not_found", "Estudante não encontrado nesta turma.")
+        # Same as the student leaving: only the membership goes away.
+        self.classrooms.remove_member(membership)
+        self.session.commit()
+
+    def close_classroom(self, professor_id: int, classroom_id: int) -> ClassroomView:
+        return self._set_closed(professor_id, classroom_id, True)
+
+    def reopen_classroom(self, professor_id: int, classroom_id: int) -> ClassroomView:
+        return self._set_closed(professor_id, classroom_id, False)
+
+    def _set_closed(self, professor_id: int, classroom_id: int, closed: bool) -> ClassroomView:
+        classroom = self._own_classroom(professor_id, classroom_id)
+        classroom.closed = closed
+        self.session.commit()
+        return self._classroom_view(classroom)
+
     def _classroom_view(self, classroom: Classroom) -> ClassroomView:
         return ClassroomView(
             classroom.id,
             classroom.name,
             classroom.join_code,
             classroom.weekly_goal,
+            classroom.closed,
             class_goal(self.classrooms, classroom, self.clock.now()),
         )
 
@@ -193,6 +225,21 @@ class ContentService:
         mission = self.missions.add(title.strip(), position, classroom_id, description)
         self.session.commit()
         return self._mission_view(mission)
+
+    def set_mission_order(
+        self, professor_id: int, classroom_id: int, mission_ids: list[int]
+    ) -> list[MissionView]:
+        """Renumber every mission of the turma 0..n-1 in the given order, all or nothing."""
+        self._own_classroom(professor_id, classroom_id)
+        missions = {m.id: m for m in self.missions.list_for_classroom(classroom_id)}
+        if len(set(mission_ids)) != len(mission_ids) or set(mission_ids) != set(missions):
+            raise ValidationFailed(
+                errors=["Informe todas as missões da turma, cada uma uma única vez."]
+            )
+        for position, mission_id in enumerate(mission_ids):
+            missions[mission_id].position = position
+        self.session.commit()
+        return [self._mission_view(missions[mission_id]) for mission_id in mission_ids]
 
     def get_mission(self, professor_id: int, mission_id: int) -> MissionView:
         return self._mission_view(self._own_mission(professor_id, mission_id))
