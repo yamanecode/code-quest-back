@@ -43,6 +43,8 @@ Settings are read from environment variables or from `.env` (never committed; se
 | `JWT_EXPIRE_HOURS` | `8` | Token lifetime |
 | `FRONTEND_ORIGIN` | | The only origin allowed by CORS |
 | `HINT_COOLDOWN_SECONDS` | `15` | Minimum time between two requested hints (there is no cap on how many) |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed logins allowed for one username from one client address inside the window; the next login answers 429 |
+| `LOGIN_WINDOW_SECONDS` | `900` | Length of that window, in seconds |
 | `LLM_PROVIDER` | `fake` | `fake` (deterministic answers, no network) or `openai_compatible` |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | | Endpoint, model and key for `openai_compatible` |
 | `LLM_REASONING_EFFORT` | | Optional `reasoning_effort` sent to reasoning models (e.g. `low`), so hidden reasoning does not use up the reply |

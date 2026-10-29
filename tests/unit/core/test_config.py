@@ -11,6 +11,13 @@ def test_T_CONFIG_01_defaults():
     assert settings.FAKE_LLM_LOG is None
 
 
+def test_T_CONFIG_04_login_limit_defaults():
+    settings = Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://x", JWT_SECRET="s")
+
+    assert settings.LOGIN_MAX_ATTEMPTS == 5
+    assert settings.LOGIN_WINDOW_SECONDS == 900
+
+
 def test_T_CONFIG_03_professor_password_is_optional_and_read_from_the_env_file(
     monkeypatch, tmp_path
 ):

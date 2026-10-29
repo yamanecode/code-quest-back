@@ -3,12 +3,14 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.attempt_limiter import AttemptLimiter
 from app.core.clock import Clock
 from app.domain.accounts import account_errors, normalize_username, password_errors
 from app.domain.enums import Role
 from app.domain.recovery_code import format_recovery_code
 from app.infra.repositories.users import UserRepository
 from app.infra.security import (
+    DUMMY_PASSWORD_HASH,
     InvalidToken,
     create_token,
     decode_token,
@@ -23,6 +25,7 @@ from app.services.exceptions import (
     Conflict,
     Forbidden,
     NotFound,
+    RateLimited,
     Unauthorized,
     ValidationFailed,
 )
@@ -58,9 +61,12 @@ def _invalid_credentials() -> Unauthorized:
 
 
 class AuthService:
-    def __init__(self, session: Session, clock: Clock) -> None:
+    def __init__(
+        self, session: Session, clock: Clock, login_limiter: AttemptLimiter | None = None
+    ) -> None:
         self.session = session
         self.clock = clock
+        self.login_limiter = login_limiter
         self.users = UserRepository(session)
 
     def register_student(self, username: str, password: str) -> Registration:
@@ -106,7 +112,7 @@ class AuthService:
             or not recovery_code_matches(recovery_code, user.recovery_code_hash)
         ):
             raise BadRequest("invalid_recovery", "Usuário ou código de recuperação inválido.")
-        self.users.set_password_hash(user, hash_password(new_password))
+        self.users.set_password_hash(user, hash_password(new_password), self.clock.now())
         code = self._issue_recovery_code(user.id)
         self.session.commit()
         return code
@@ -135,18 +141,39 @@ class AuthService:
         user = self.users.get_by_username(username)
         if user is None or user.role == Role.SYSTEM:
             raise NotFound("user_not_found", "Usuário não encontrado.")
-        self.users.set_password_hash(user, hash_password(new_password))
+        self.users.set_password_hash(user, hash_password(new_password), self.clock.now())
         self.session.commit()
 
-    def login(self, username: str, password: str) -> LoginResult:
-        user = self.users.get_by_username(normalize_username(username))
-        # Same error for every case, so the response never tells which usernames exist.
+    def login(self, username: str, password: str, client_ip: str) -> LoginResult:
+        username = normalize_username(username)
+        key = (username, client_ip)
+        self._refuse_when_blocked(key)
+        user = self.users.get_by_username(username)
+        # Same error and same work for every case, so neither the answer nor its timing
+        # tells which usernames exist.
         if user is None or user.role == Role.SYSTEM:
-            raise _invalid_credentials()
+            verify_password(password, DUMMY_PASSWORD_HASH)
+            raise self._failed_login(key)
         if not verify_password(password, user.password_hash):
-            raise _invalid_credentials()
+            raise self._failed_login(key)
+        if self.login_limiter:
+            self.login_limiter.clear(key)
         token = create_token(user.id, user.role, self.clock.now())
         return LoginResult(access_token=token, role=user.role)
+
+    def _refuse_when_blocked(self, key: tuple[str, str]) -> None:
+        wait = self.login_limiter.check(key, self.clock.now()) if self.login_limiter else None
+        if wait is not None:
+            raise RateLimited(
+                "too_many_attempts",
+                "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
+                retry_after=wait,
+            )
+
+    def _failed_login(self, key: tuple[str, str]) -> Unauthorized:
+        if self.login_limiter:
+            self.login_limiter.record_failure(key, self.clock.now())
+        return _invalid_credentials()
 
     def current_user(self, token: str) -> Account:
         try:
@@ -156,5 +183,9 @@ class AuthService:
         # The role comes from the database, so a stale token cannot keep an old role.
         user = self.users.get(claims.user_id)
         if user is None or user.role == Role.SYSTEM:
+            raise Unauthorized()
+        # A password change ends the sessions started before it (whole seconds, like "iat").
+        changed = user.password_changed_at
+        if changed is not None and claims.issued_at < int(changed.timestamp()):
             raise Unauthorized()
         return Account(user.id, user.username, user.role)

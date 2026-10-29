@@ -40,3 +40,9 @@ def test_T_RECOV_15_an_account_made_before_the_feature_has_no_code(session):
     assert user.recovery_code_hash is None
     assert user.recovery_code_created_at is None
     assert user.recovery_code_confirmed is False
+
+
+def test_T_MIG_03_users_have_password_changed_at(engine: Engine):
+    columns = {column["name"]: column for column in inspect(engine).get_columns("users")}
+
+    assert columns["password_changed_at"]["nullable"]

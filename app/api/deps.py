@@ -7,6 +7,7 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.attempt_limiter import AttemptLimiter
 from app.core.clock import Clock, SystemClock
 from app.core.config import get_settings
 from app.core.ports import LLMClient
@@ -36,10 +37,19 @@ def get_llm_client() -> LLMClient:
     return build_llm_client(get_settings())
 
 
+@lru_cache
+def get_login_limiter() -> AttemptLimiter:
+    """One limiter per process: it holds the failed logins in memory."""
+    settings = get_settings()
+    return AttemptLimiter(settings.LOGIN_MAX_ATTEMPTS, settings.LOGIN_WINDOW_SECONDS)
+
+
 def get_auth_service(
-    session: DbSession, clock: Annotated[Clock, Depends(get_clock)]
+    session: DbSession,
+    clock: Annotated[Clock, Depends(get_clock)],
+    limiter: Annotated[AttemptLimiter, Depends(get_login_limiter)],
 ) -> AuthService:
-    return AuthService(session, clock)
+    return AuthService(session, clock, limiter)
 
 
 def get_content_service(

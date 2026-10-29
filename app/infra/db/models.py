@@ -56,6 +56,7 @@ class User(_Row):
     recovery_code_confirmed: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Classroom(_Row):

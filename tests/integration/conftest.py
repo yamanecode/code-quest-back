@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_llm_client
+from app.api.deps import get_clock, get_llm_client, get_login_limiter
+from app.core.attempt_limiter import AttemptLimiter
 from app.core.config import get_settings
 from app.domain.badges import BADGES
 from app.infra.db.models import Base
@@ -62,10 +63,20 @@ def llm() -> FakeLLMClient:
 
 
 @pytest.fixture
-def client(session: Session, clock: FixedClock, llm: FakeLLMClient) -> Iterator[TestClient]:
+def limiter() -> AttemptLimiter:
+    """A new login limiter per test, so failed logins never carry over between tests."""
+    settings = get_settings()
+    return AttemptLimiter(settings.LOGIN_MAX_ATTEMPTS, settings.LOGIN_WINDOW_SECONDS)
+
+
+@pytest.fixture
+def client(
+    session: Session, clock: FixedClock, llm: FakeLLMClient, limiter: AttemptLimiter
+) -> Iterator[TestClient]:
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_clock] = lambda: clock
     app.dependency_overrides[get_llm_client] = lambda: llm
+    app.dependency_overrides[get_login_limiter] = lambda: limiter
     with TestClient(app) as test_client:
         yield test_client

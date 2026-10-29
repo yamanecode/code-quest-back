@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.api.deps import Auth
 from app.api.schemas.auth import (
@@ -25,8 +25,10 @@ def register(body: Credentials, auth: Auth) -> RegisterOut:
 
 
 @router.post("/login")
-def login(body: Credentials, auth: Auth) -> TokenOut:
-    result = auth.login(body.username, body.password)
+def login(body: Credentials, request: Request, auth: Auth) -> TokenOut:
+    # X-Forwarded-For is not trusted: anyone could write it to dodge the limit.
+    client_ip = request.client.host if request.client else "unknown"
+    result = auth.login(body.username, body.password, client_ip)
     return TokenOut(access_token=result.access_token, role=result.role)
 
 

@@ -95,3 +95,18 @@ def test_T_SEC_RECOV_03_match_accepts_any_formatting_and_rejects_other_codes():
     assert recovery_code_matches(format_recovery_code(code).lower(), stored)
     assert not recovery_code_matches(generate_recovery_code(), stored)
     assert not recovery_code_matches("", stored)
+
+
+def test_T_SEC_07_token_carries_the_issue_time_in_whole_seconds():
+    token = create_token(7, "student", NOW)
+
+    claims = decode_token(token, NOW)
+
+    assert claims.issued_at == int(NOW.timestamp())
+
+
+def test_T_SEC_07_token_without_iat_still_decodes_with_issue_time_zero():
+    exp = int((NOW + timedelta(hours=1)).timestamp())
+    token = jwt.encode({"sub": "7", "role": "student", "exp": exp}, SECRET, "HS256")
+
+    assert decode_token(token, NOW).issued_at == 0

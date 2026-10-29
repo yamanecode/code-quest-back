@@ -110,6 +110,8 @@ Invoke-Step "load-base (second load)" { uv run python -m app.cli load-base conte
 $env:LLM_PROVIDER = "fake"
 $env:FAKE_LLM_LOG = Join-Path $Root "docs/evidence/fake-llm.jsonl"
 $env:HINT_COOLDOWN_SECONDS = "2"
+# Tests type wrong passwords on purpose; the login limit would block the later ones.
+$env:LOGIN_MAX_ATTEMPTS = "1000"
 $env:FUNCTIONAL_BASE_URL = $BaseUrl
 Remove-Item $env:FAKE_LLM_LOG -ErrorAction SilentlyContinue
 
