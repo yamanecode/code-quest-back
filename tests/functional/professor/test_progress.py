@@ -79,7 +79,6 @@ def test_FT_PROF_08_solve_stats_count_distinct_students(professor: Account, new_
 
     fail(alice, challenge)
     solve(alice, challenge)
-    solve(alice, challenge)
     fail(bruno, challenge)
     fail(bruno, challenge)
 

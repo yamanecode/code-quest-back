@@ -34,7 +34,7 @@ class MyClassroom:
 
 
 def class_goal(classrooms: ClassroomRepository, classroom: Classroom, now: datetime) -> Goal | None:
-    """This week's class goal (spec §5.3); None when closed or nothing is left to solve."""
+    """This week's class goal (RF-19); None when closed or nothing is left to solve."""
     if classroom.closed:
         return None
     start = week_start(now)

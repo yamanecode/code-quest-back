@@ -83,3 +83,60 @@ def test_FT_CLASS_05_leaving_hides_missions_and_keeps_xp_and_badges(
     assert {badge["code"] for badge in after["badges"] if badge["earned"]} == earned
     assert "first_solve" in earned
     assert_error(student.client.delete(f"/api/classrooms/{turma.id}/membership"), 404)
+
+
+@pytest.mark.req("RF-18")
+def test_FT_CLASS_06_a_closed_class_rejects_its_code_and_keeps_its_members(
+    professor: Account, student: Account, new_student
+):
+    turma = turma_with_mission(professor, ("pattern",))
+    join(student, turma.join_code)
+    late = new_student()
+
+    closed = professor.client.post(f"/api/professor/classrooms/{turma.id}/close")
+    refused = late.client.post("/api/classrooms/join", json={"join_code": turma.join_code})
+    mission = student.client.get(f"/api/missions/{turma.mission['id']}")
+    professor.client.post(f"/api/professor/classrooms/{turma.id}/reopen")
+
+    assert closed.status_code == 200 and closed.json()["closed"] is True
+    assert_error(refused, 404, "invalid_join_code")
+    assert mission.status_code == 200
+    assert join(late, turma.join_code)["id"] == turma.id
+
+
+@pytest.mark.req("RF-18")
+def test_FT_CLASS_07_a_renewed_code_replaces_the_old_one(
+    professor: Account, student: Account, new_student
+):
+    classroom = new_classroom(professor)
+    join(student, classroom["join_code"])
+
+    response = professor.client.post(f"/api/professor/classrooms/{classroom['id']}/new-code")
+
+    assert response.status_code == 200, response.text
+    renewed = response.json()["join_code"]
+    assert renewed != classroom["join_code"]
+    newcomer = new_student()
+    old = newcomer.client.post("/api/classrooms/join", json={"join_code": classroom["join_code"]})
+    assert_error(old, 404, "invalid_join_code")
+    assert join(newcomer, renewed)["id"] == classroom["id"]
+    assert my_classroom_ids(student) == [classroom["id"]]
+
+
+@pytest.mark.req("RF-18")
+def test_FT_CLASS_08_a_removed_student_loses_the_missions_and_keeps_xp_and_badges(
+    professor: Account, student: Account
+):
+    turma = turma_with_mission(professor, ("filtering",))
+    join(student, turma.join_code)
+    solve(student, turma.challenges[0])
+
+    url = f"/api/professor/classrooms/{turma.id}/members/{student.username}"
+    response = professor.client.delete(url)
+
+    assert response.status_code == 204
+    assert my_classroom_ids(student) == []
+    assert_error(student.client.get(f"/api/missions/{turma.mission['id']}"), 404)
+    me = profile(student)
+    assert me["xp"] == 10
+    assert any(badge["code"] == "first_solve" and badge["earned"] for badge in me["badges"])

@@ -5,16 +5,15 @@ from sqlalchemy.orm import Session
 
 from app.domain.accounts import account_errors
 from app.domain.badges import BADGES
-from app.domain.challenge_types import ChallengeType
-from app.domain.enums import ContentStatus, Origin, Role
+from app.domain.challenge_types import ChallengeDraft, ChallengeType
+from app.domain.enums import Origin, Role
 from app.infra.db.models import Classroom, User
 from app.infra.repositories.badges import BadgeRepository
-from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.users import UserRepository
 from app.infra.security import hash_password
-from app.services.content_service import ChallengeDraft, rule_errors
+from app.services.content_service import MissionDraft, add_published_mission
 from app.services.exceptions import Conflict, ValidationFailed
 
 DEMO_PROFESSOR = "prof_demo"
@@ -103,14 +102,13 @@ DEMO_CHALLENGES = (
 
 
 class DemoService:
-    """Demonstration data (spec §11): one professor, one turma and one challenge per type."""
+    """Demonstration data: one professor, one turma and one challenge per type."""
 
     def __init__(self, session: Session) -> None:
         self.session = session
         self.users = UserRepository(session)
         self.classrooms = ClassroomRepository(session)
         self.missions = MissionRepository(session)
-        self.challenges = ChallengeRepository(session)
 
     def seed(self, read_password: Callable[[], str | None]) -> list[str]:
         """Create what is missing and return what was created; `read_password` is only
@@ -121,7 +119,10 @@ class DemoService:
         classroom = self._classroom(professor, created)
         titles = {mission.title for mission in self.missions.list_for_classroom(classroom.id)}
         if DEMO_MISSION not in titles:
-            self._add_mission(professor.id, classroom.id)
+            mission = MissionDraft(DEMO_MISSION, DEMO_MISSION_DESCRIPTION, 1, list(DEMO_CHALLENGES))
+            add_published_mission(
+                self.session, professor.id, mission, Origin.PROFESSOR, classroom.id
+            )
             created.append(DEMO_MISSION)
         self.session.commit()
         return created
@@ -163,29 +164,3 @@ class DemoService:
                 )
             )
         return classroom
-
-    def _add_mission(self, professor_id: int, classroom_id: int) -> None:
-        mission = self.missions.add(
-            title=DEMO_MISSION,
-            position=1,
-            classroom_id=classroom_id,
-            description=DEMO_MISSION_DESCRIPTION,
-            status=ContentStatus.PUBLISHED,
-        )
-        challenge_ids = []
-        for draft in DEMO_CHALLENGES:
-            errors = rule_errors(draft)
-            if errors:
-                self._abort(ValidationFailed(errors=errors))
-            challenge = self.challenges.add(
-                owner_id=professor_id,
-                title=draft.title,
-                statement=draft.statement,
-                challenge_type=ChallengeType(draft.type),
-                content=draft.content,
-                explanation=draft.explanation,
-                origin=Origin.PROFESSOR,
-                status=ContentStatus.PUBLISHED,
-            )
-            challenge_ids.append(challenge.id)
-        self.missions.set_challenges(mission.id, challenge_ids)

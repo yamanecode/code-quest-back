@@ -14,7 +14,60 @@ FAKE_REVIEW = (
     "da turma e se existe só uma resposta correta."
 )
 
+# Drafts that pass the template rules and the draft rules.
 _DRAFT_CONTENT = {
+    ChallengeType.ORDERING: {
+        "items": [
+            {"id": "a", "text": "Refogar o arroz lavado com alho"},
+            {"id": "b", "text": "Lavar o arroz em água corrente"},
+            {"id": "c", "text": "Desligar o fogo e deixar a panela tampada"},
+            {"id": "d", "text": "Acrescentar água fervente ao refogado"},
+            {"id": "e", "text": "Cozinhar em fogo baixo até a água secar"},
+        ],
+        "solution": ["b", "a", "d", "e", "c"],
+    },
+    ChallengeType.GROUPING: {
+        "groups": [
+            {"id": "g1", "text": "Alimentação"},
+            {"id": "g2", "text": "Som e música"},
+            {"id": "g3", "text": "Divulgação"},
+        ],
+        "items": [
+            {"id": "a", "text": "Encomendar os salgados"},
+            {"id": "b", "text": "Testar as caixas de som"},
+            {"id": "c", "text": "Criar o cartaz do evento"},
+            {"id": "d", "text": "Calcular quantos litros de suco comprar"},
+            {"id": "e", "text": "Montar a lista de músicas"},
+            {"id": "f", "text": "Enviar o convite no grupo da turma"},
+        ],
+        "solution": {"a": "g1", "b": "g2", "c": "g3", "d": "g1", "e": "g2", "f": "g3"},
+    },
+    ChallengeType.FILTERING: {
+        "question": "Quanto tempo Lia leva de casa até a escola?",
+        "items": [
+            {"id": "a", "text": "Lia sai de casa às 6h40"},
+            {"id": "b", "text": "Lia caminha 10 minutos até o ponto"},
+            {"id": "c", "text": "O ônibus tem 40 lugares"},
+            {"id": "d", "text": "O ônibus leva 25 minutos até a escola"},
+            {"id": "e", "text": "A mochila de Lia pesa 4 kg"},
+            {"id": "f", "text": "A escola tem 3 andares"},
+        ],
+        "solution": ["b", "d"],
+    },
+    ChallengeType.PATTERN: {
+        "sequence": ["3", "5", "9", "17"],
+        "options": [
+            {"id": "a", "text": "25"},
+            {"id": "b", "text": "33"},
+            {"id": "c", "text": "34"},
+            {"id": "d", "text": "31"},
+        ],
+        "solution": "b",
+    },
+}
+
+# Valid by the template rules but too easy for the draft rules (trigger "[fake:easy]").
+_EASY_CONTENT = {
     ChallengeType.ORDERING: {
         "items": [
             {"id": "a", "text": "Separar o material"},
@@ -72,7 +125,8 @@ class FakeLLMClient:
     Server mode tells the features apart by the lines the prompt builders write
     ("Tema:" for drafts, "Nível da dica:" for hints, anything else is a review).
     Triggers: "[fake:error]" anywhere fails the call, "[fake:leak]" makes a hint echo the
-    prompt (which holds the solution) and "[fake:invalid]" makes a draft that is not JSON.
+    prompt (which holds the solution), "[fake:invalid]" makes a draft that is not JSON and
+    "[fake:easy]" a draft that breaks the draft rules.
     """
 
     def __init__(
@@ -123,6 +177,6 @@ def _draft(challenge_type: ChallengeType, topic: str) -> str:
         "title": f"Rascunho: {topic}"[:TITLE_MAX].strip(),
         "statement": f"Desafio sobre {topic}. Leia com atenção e use o raciocínio pedido.",
         "explanation": "Rascunho criado para o professor revisar.",
-        "content": _DRAFT_CONTENT[challenge_type],
+        "content": (_EASY_CONTENT if "[fake:easy]" in topic else _DRAFT_CONTENT)[challenge_type],
     }
     return json.dumps(draft, ensure_ascii=False)

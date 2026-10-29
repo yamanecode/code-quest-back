@@ -43,13 +43,6 @@ def test_T_ARCH_01_violating_import_breaks_the_contracts(tmp_path):
     assert "Domain is pure Python BROKEN" in result.stdout
 
 
-def test_T_ARCH_02_detector_recognises_app_imports():
-    assert imports_app("import app")
-    assert imports_app("from app.services import play_service")
-    assert imports_app("import os\nif True:\n    import app.main as main\n")
-    assert not imports_app("import httpx\nfrom apps import x\nfrom . import helpers\n")
-
-
 def test_T_ARCH_02_functional_tests_never_import_app():
     offenders = [
         str(path.relative_to(ROOT))

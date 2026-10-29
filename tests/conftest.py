@@ -7,5 +7,4 @@ os.environ.setdefault(
 )
 os.environ.setdefault("FRONTEND_ORIGIN", "http://localhost:3000")
 os.environ["LLM_PROVIDER"] = "fake"
-os.environ["HINT_CAP"] = "5"
 os.environ["HINT_COOLDOWN_SECONDS"] = "15"

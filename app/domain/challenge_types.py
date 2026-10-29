@@ -3,6 +3,7 @@ import hashlib
 import string
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -54,11 +55,22 @@ GROUPS = ("groups", "etapas", "das etapas")
 OPTIONS = ("options", "opções", "das opções")
 
 
+@dataclass(frozen=True)
+class ChallengeDraft:
+    """A challenge's own data, as written by a professor, the AI or a base file."""
+
+    title: str
+    statement: str
+    type: str
+    content: dict
+    explanation: str | None = None
+
+
 def _text_ok(value: object, low: int, high: int) -> bool:
     return isinstance(value, str) and value.strip() != "" and low <= len(value) <= high
 
 
-def _is_text_list(value: object) -> bool:
+def is_text_list(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(entry, str) for entry in value)
 
 
@@ -108,7 +120,7 @@ def _validate_ordering(content: dict) -> list[str]:
     items = _check_elements(content, ITEMS, *ORDERING_ITEMS, errors)
     _check_unique_texts(items, errors)
     solution = content.get("solution")
-    if not _is_text_list(solution) or Counter(solution) != Counter(_ids(items)):
+    if not is_text_list(solution) or Counter(solution) != Counter(_ids(items)):
         errors.append("A solução deve ordenar todos os itens, cada um uma única vez.")
     return errors
 
@@ -141,7 +153,7 @@ def _validate_filtering(content: dict) -> list[str]:
     solution = content.get("solution")
     item_ids = set(_ids(items))
     if (
-        not _is_text_list(solution)
+        not is_text_list(solution)
         or len(set(solution)) != len(solution)
         or not set(solution) <= item_ids
     ):
@@ -184,6 +196,12 @@ def validate_content(challenge_type: str, content: object) -> list[str]:
     return validator(content)
 
 
+def challenge_errors(draft: ChallengeDraft) -> list[str]:
+    """Every template rule the challenge breaks; empty when it can be saved."""
+    field_errors = validate_challenge(draft.title, draft.statement, draft.explanation)
+    return field_errors + validate_content(draft.type, draft.content)
+
+
 def _count_rule(limits: tuple[int, int], noun: str) -> str:
     return f"De {limits[0]} a {limits[1]} {noun}."
 
@@ -220,7 +238,7 @@ _TYPE_RULES = {
 
 
 def template_rules(challenge_type: str) -> list[str]:
-    """The template rules of spec 4.1 as PT-BR sentences, for AI prompts."""
+    """The template rules as PT-BR sentences, for AI prompts."""
     return _COMMON_RULES + _TYPE_RULES[ChallengeType(challenge_type)]
 
 
@@ -293,7 +311,7 @@ def structure_changed(challenge_type: str, old_content: dict, new_content: dict)
     return _structure(challenge_type, old_content) != _structure(challenge_type, new_content)
 
 
-# Types whose items students see shuffled and renamed (spec 4.2).
+# Types whose items students see shuffled and renamed (SG-08).
 SHUFFLED_TYPES = (ChallengeType.ORDERING, ChallengeType.GROUPING, ChallengeType.FILTERING)
 
 
@@ -322,7 +340,7 @@ def student_ids(challenge_type: str, content: dict, seed: str) -> dict[str, str]
 
 
 def to_student_view(challenge_type: str, content: dict, seed: str) -> dict:
-    """Content without the solution; items shuffled and renamed per student (spec 4.2)."""
+    """Content without the solution; items shuffled and renamed per student (SG-08)."""
     challenge_type = ChallengeType(challenge_type)
     view = copy.deepcopy({key: value for key, value in content.items() if key != "solution"})
     ids = student_ids(challenge_type, content, seed)

@@ -68,10 +68,7 @@ def get_ai_service(
     llm: Annotated[LLMClient, Depends(get_llm_client)],
     content: Annotated[ContentService, Depends(get_content_service)],
 ) -> AIService:
-    settings = get_settings()
-    return AIService(
-        session, clock, llm, content, settings.HINT_CAP, settings.HINT_COOLDOWN_SECONDS
-    )
+    return AIService(session, clock, llm, content, get_settings().HINT_COOLDOWN_SECONDS)
 
 
 def get_play_service(

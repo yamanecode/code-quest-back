@@ -65,7 +65,7 @@ class ChallengeRepository:
     def published_examples(
         self, owner_id: int, challenge_type: ChallengeType, limit: int = RAG_EXAMPLES
     ) -> list[Challenge]:
-        """The owner's newest published challenges of one type (light RAG, spec §6.6)."""
+        """The owner's newest published challenges of one type (light RAG, RF-15)."""
         query = (
             select(Challenge)
             .where(

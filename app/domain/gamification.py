@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 XP_PER_LEVEL = 50
+FIRST_TRY_XP = 10
 
 # (lowest level of the band, title), highest band first.
 LEVEL_TITLES = (
@@ -26,15 +27,11 @@ def _to_local(moment: datetime) -> datetime:
     return moment.astimezone(TIMEZONE)
 
 
-def local_date(moment: datetime) -> date:
-    return _to_local(moment).date()
-
-
 def xp_for_wrong_attempts(wrong_attempts: int) -> int:
     if wrong_attempts < 0:
         raise ValueError("wrong_attempts cannot be negative")
     if wrong_attempts == 0:
-        return 10
+        return FIRST_TRY_XP
     if wrong_attempts <= 2:
         return 5
     return 2

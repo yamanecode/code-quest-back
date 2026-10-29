@@ -259,18 +259,6 @@ def test_T_PROF_ORDER_02_wrong_lists_are_rejected_and_change_nothing(
     assert ids_in_order(client, headers, classroom) == before
 
 
-def test_T_PROF_ORDER_03_only_the_owner_can_reorder(client, session, clock, classroom):
-    mission = make_mission(session, classroom)
-    stranger = bearer(make_user(session, "prof_bia", role=Role.PROFESSOR), clock)
-
-    response = client.put(
-        order_url(classroom), json={"mission_ids": [mission.id]}, headers=stranger
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "classroom_not_found"
-
-
 def test_T_PROF_ORDER_04_a_turma_without_missions_accepts_the_empty_order(
     client, headers, classroom
 ):

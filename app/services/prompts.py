@@ -1,6 +1,6 @@
-"""Prompt builders for the AI features (spec 6.2).
+"""Prompt builders for the AI features (SG-01, SG-06).
 
-They only receive challenge data (ChallengeText), never a user or a turma, so personal
+They only receive challenge data (ChallengeDraft), never a user or a turma, so personal
 data cannot reach a prompt.
 """
 
@@ -10,18 +10,11 @@ from dataclasses import dataclass
 from app.domain.challenge_types import (
     SKILL_DESCRIPTIONS,
     SKILL_LABELS,
+    ChallengeDraft,
     ChallengeType,
     template_rules,
 )
-
-
-@dataclass(frozen=True)
-class ChallengeText:
-    type: str
-    title: str
-    statement: str
-    content: dict
-    explanation: str | None = None
+from app.domain.draft_rules import draft_rules
 
 
 @dataclass(frozen=True)
@@ -64,11 +57,41 @@ REVIEW_SYSTEM = (
     "em no máximo 5 tópicos curtos."
 )
 
+# Audience and task criteria from Bebras (Dagienė and Futschek, 2008); options and
+# distractors from Haladyna, Downing and Rodriguez (2002). The checkable part is in
+# app/domain/draft_rules.py; the rest can only be asked for here.
 DRAFT_SYSTEM = (
-    "Você cria rascunhos de desafios de pensamento computacional sem código, "
-    "em português do Brasil, com temas do cotidiano e sem exigir conhecimento de programação. "
+    "Você cria rascunhos de desafios de pensamento computacional sem código, em português do "
+    "Brasil, para estudantes de 14 a 16 anos (faixa Junior do Bebras). "
+    "O desafio deve exigir raciocínio de vários passos e poder ser resolvido em cerca de "
+    "3 minutos, sem conhecimento prévio de programação: nada que se resolva só de bater o olho. "
+    "Use situações reais do cotidiano de um adolescente, com linguagem clara e respeitosa, sem "
+    "infantilizar (nada de diminutivos, mascotes ou tom de historinha). "
+    "Escreva um enunciado curto que diga exatamente o que fazer, sem entregar a resposta. "
+    "Opções e informações erradas devem ser plausíveis, do mesmo tema e baseadas em erros comuns "
+    "de raciocínio, nunca absurdas; as opções devem ter forma e tamanho parecidos e só uma pode "
+    "estar correta. O estudante pode pedir dicas, então o desafio pode ser exigente. "
     "Responda apenas com um objeto JSON, sem nenhum texto antes ou depois."
 )
+
+DRAFT_GUIDANCE = {
+    ChallengeType.ORDERING: (
+        "Os passos devem depender uns dos outros (cada um usa o resultado de outro), "
+        "de modo que só uma ordem funcione."
+    ),
+    ChallengeType.GROUPING: (
+        "Cada item deve pertencer a uma única etapa por um motivo que exija pensar, "
+        "não por uma palavra repetida."
+    ),
+    ChallengeType.FILTERING: (
+        "As informações irrelevantes devem parecer úteis à primeira vista, e a pergunta deve "
+        "exigir combinar as relevantes."
+    ),
+    ChallengeType.PATTERN: (
+        "A regra deve combinar duas operações, alternar ou depender da posição; as opções "
+        "erradas devem vir de regras parecidas, porém erradas."
+    ),
+}
 
 _DRAFT_SHAPES = {
     ChallengeType.ORDERING: {
@@ -154,7 +177,7 @@ def _bullets(title: str, lines: list[str]) -> list[str]:
 
 
 def hint_prompt(
-    challenge: ChallengeText,
+    challenge: ChallengeDraft,
     level: int,
     previous_hints: list[str],
     answer: dict | None = None,
@@ -179,7 +202,7 @@ def hint_prompt(
     return Prompt(HINT_SYSTEM, "\n".join(lines))
 
 
-def review_prompt(challenge: ChallengeText) -> Prompt:
+def review_prompt(challenge: ChallengeDraft) -> Prompt:
     lines = [
         _type_line(challenge.type),
         f"Título: {challenge.title}",
@@ -191,7 +214,7 @@ def review_prompt(challenge: ChallengeText) -> Prompt:
     return Prompt(REVIEW_SYSTEM, "\n".join(lines))
 
 
-def _example_json(example: ChallengeText) -> str:
+def _example_json(example: ChallengeDraft) -> str:
     fields = {
         "title": example.title,
         "statement": example.statement,
@@ -204,7 +227,7 @@ def _example_json(example: ChallengeText) -> str:
 def draft_prompt(
     challenge_type: str,
     topic: str,
-    examples: list[ChallengeText],
+    examples: list[ChallengeDraft],
     errors: list[str] | tuple[str, ...] = (),
 ) -> Prompt:
     challenge_type = ChallengeType(challenge_type)
@@ -218,7 +241,9 @@ def draft_prompt(
         f"Tipo: {challenge_type.value}",
         f"Habilidade: {SKILL_LABELS[challenge_type]}. {SKILL_DESCRIPTIONS[challenge_type]}",
         f"Tema: {topic}",
+        DRAFT_GUIDANCE[challenge_type],
         *_bullets("Regras do modelo", template_rules(challenge_type)),
+        *_bullets("Regras de dificuldade (conferidas pelo sistema)", draft_rules(challenge_type)),
         "Formato JSON esperado (o conteúdo segue o tipo):",
         json.dumps(shape, ensure_ascii=False),
     ]

@@ -49,6 +49,30 @@ SKILL_BADGES = (
 )
 SKILL_STEPS = (("I", 3, Tier.BRONZE), ("II", 7, Tier.SILVER), ("III", 15, Tier.GOLD))
 
+# Families of badges earned when one number reaches a threshold: (threshold, name, tier).
+LEVEL_STEPS = (
+    (3, "Explorador(a)", Tier.BRONZE),
+    (5, "Estrategista", Tier.SILVER),
+    (8, "Arquiteto(a) de soluções", Tier.SILVER),
+    (11, "Mestre do pensamento", Tier.GOLD),
+)
+MISSION_STEPS = (
+    (1, "Primeira missão", Tier.BRONZE),
+    (5, "Cinco missões", Tier.SILVER),
+    (10, "Dez missões", Tier.GOLD),
+)
+STREAK_STEPS = (
+    (3, "Três dias seguidos", Tier.BRONZE),
+    (7, "Sete dias seguidos", Tier.SILVER),
+    (14, "Catorze dias seguidos", Tier.GOLD),
+)
+FIRST_TRY_STEPS = ((5, "Precisão", Tier.SILVER), (20, "Precisão afiada", Tier.GOLD))
+CLASS_GOAL_STEPS = ((1, "Trabalho em equipe", Tier.BRONZE), (5, "Equipe afinada", Tier.SILVER))
+
+
+def _at_least(stat: str, threshold: int) -> Condition:
+    return lambda stats: getattr(stats, stat) >= threshold
+
 
 def _solved_of_type(challenge_type: ChallengeType, threshold: int) -> Condition:
     return lambda stats: stats.solved_by_type.get(challenge_type, 0) >= threshold
@@ -69,91 +93,48 @@ def _skill_rules() -> list[tuple[Badge, Condition]]:
     return rules
 
 
+def _family(
+    prefix: str,
+    emoji: str,
+    stat: str,
+    steps: tuple[tuple[int, str, Tier], ...],
+    describe: Callable[[int], str],
+) -> list[tuple[Badge, Condition]]:
+    return [
+        (Badge(f"{prefix}_{n}", name, describe(n), tier, emoji), _at_least(stat, n))
+        for n, name, tier in steps
+    ]
+
+
+def _plural(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
 _RULES: list[tuple[Badge, Condition]] = [
     (
         Badge(
             "first_solve", "Primeiro desafio", "Resolva seu primeiro desafio.", Tier.BRONZE, "⭐"
         ),
-        lambda stats: stats.solved_total >= 1,
+        _at_least("solved_total", 1),
     ),
     *_skill_rules(),
-    (
-        Badge("level_3", "Explorador(a)", "Chegue ao nível 3.", Tier.BRONZE, "🧭"),
-        lambda stats: stats.level >= 3,
+    *_family("level", "🧭", "level", LEVEL_STEPS, lambda n: f"Chegue ao nível {n}."),
+    *_family(
+        "mission",
+        "🚩",
+        "missions_completed",
+        MISSION_STEPS,
+        lambda n: f"Complete {_plural(n, 'missão', 'missões')}.",
     ),
-    (
-        Badge("level_5", "Estrategista", "Chegue ao nível 5.", Tier.SILVER, "🧭"),
-        lambda stats: stats.level >= 5,
+    *_family(
+        "streak", "🔥", "streak", STREAK_STEPS, lambda n: f"Resolva desafios em {n} dias seguidos."
     ),
-    (
-        Badge("level_8", "Arquiteto(a) de soluções", "Chegue ao nível 8.", Tier.SILVER, "🧭"),
-        lambda stats: stats.level >= 8,
-    ),
-    (
-        Badge("level_11", "Mestre do pensamento", "Chegue ao nível 11.", Tier.GOLD, "🧭"),
-        lambda stats: stats.level >= 11,
-    ),
-    (
-        Badge("mission_1", "Primeira missão", "Complete 1 missão.", Tier.BRONZE, "🚩"),
-        lambda stats: stats.missions_completed >= 1,
-    ),
-    (
-        Badge("mission_5", "Cinco missões", "Complete 5 missões.", Tier.SILVER, "🚩"),
-        lambda stats: stats.missions_completed >= 5,
-    ),
-    (
-        Badge("mission_10", "Dez missões", "Complete 10 missões.", Tier.GOLD, "🚩"),
-        lambda stats: stats.missions_completed >= 10,
-    ),
-    (
-        Badge(
-            "streak_3",
-            "Três dias seguidos",
-            "Resolva desafios em 3 dias seguidos.",
-            Tier.BRONZE,
-            "🔥",
-        ),
-        lambda stats: stats.streak >= 3,
-    ),
-    (
-        Badge(
-            "streak_7",
-            "Sete dias seguidos",
-            "Resolva desafios em 7 dias seguidos.",
-            Tier.SILVER,
-            "🔥",
-        ),
-        lambda stats: stats.streak >= 7,
-    ),
-    (
-        Badge(
-            "streak_14",
-            "Catorze dias seguidos",
-            "Resolva desafios em 14 dias seguidos.",
-            Tier.GOLD,
-            "🔥",
-        ),
-        lambda stats: stats.streak >= 14,
-    ),
-    (
-        Badge(
-            "first_try_5",
-            "Precisão",
-            "Acerte 5 desafios na primeira tentativa.",
-            Tier.SILVER,
-            "🎯",
-        ),
-        lambda stats: stats.first_try_solves >= 5,
-    ),
-    (
-        Badge(
-            "first_try_20",
-            "Precisão afiada",
-            "Acerte 20 desafios na primeira tentativa.",
-            Tier.GOLD,
-            "🎯",
-        ),
-        lambda stats: stats.first_try_solves >= 20,
+    *_family(
+        "first_try",
+        "🎯",
+        "first_try_solves",
+        FIRST_TRY_STEPS,
+        lambda n: f"Acerte {n} desafios na primeira tentativa.",
     ),
     (
         Badge(
@@ -163,27 +144,14 @@ _RULES: list[tuple[Badge, Condition]] = [
             Tier.SILVER,
             "📅",
         ),
-        lambda stats: stats.dailies_solved >= 7,
+        _at_least("dailies_solved", 7),
     ),
-    (
-        Badge(
-            "class_goal_1",
-            "Trabalho em equipe",
-            "Ajude sua turma a cumprir 1 meta semanal.",
-            Tier.BRONZE,
-            "🤝",
-        ),
-        lambda stats: stats.goals_contributed >= 1,
-    ),
-    (
-        Badge(
-            "class_goal_5",
-            "Equipe afinada",
-            "Ajude sua turma a cumprir 5 metas semanais.",
-            Tier.SILVER,
-            "🤝",
-        ),
-        lambda stats: stats.goals_contributed >= 5,
+    *_family(
+        "class_goal",
+        "🤝",
+        "goals_contributed",
+        CLASS_GOAL_STEPS,
+        lambda n: f"Ajude sua turma a cumprir {_plural(n, 'meta semanal', 'metas semanais')}.",
     ),
     (
         Badge(
@@ -205,7 +173,7 @@ _RULES: list[tuple[Badge, Condition]] = [
             "🦉",
             hidden=True,
         ),
-        lambda stats: stats.missions_completed_without_hints >= 1,
+        _at_least("missions_completed_without_hints", 1),
     ),
 ]
 

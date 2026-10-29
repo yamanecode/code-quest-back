@@ -28,7 +28,6 @@ STATUSES = ("passed", "failed", "MISSING", "manual")
 @dataclass
 class Requirement:
     id: str
-    phase: str
     requirement: str
     acceptance: str
 
@@ -78,9 +77,9 @@ def parse_requirements(markdown: str) -> list[Requirement]:
         if not line.lstrip().startswith("|"):
             continue
         cells = split_row(line.strip())
-        if len(cells) < 4 or not ID_PATTERN.match(cells[0]):
+        if len(cells) < 3 or not ID_PATTERN.match(cells[0]):
             continue
-        requirements.append(Requirement(cells[0], cells[1], cells[2], cells[3]))
+        requirements.append(Requirement(cells[0], cells[1], cells[2]))
     return requirements
 
 

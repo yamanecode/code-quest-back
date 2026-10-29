@@ -93,7 +93,7 @@ class ClassroomRepository:
         query = select(func.count()).where(ClassroomMember.classroom_id == classroom_id)
         return self.session.scalar(query) or 0
 
-    # Class goal (spec §5.3): first solves of current members on the turma's
+    # Class goal (RF-19): first solves of current members on the turma's
     # published challenges inside published missions.
 
     def _members(self, classroom_id: int):

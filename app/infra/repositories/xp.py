@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -6,10 +5,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.domain.enums import Role, XPReason
+from app.domain.gamification import FIRST_TRY_XP
 from app.infra.db.models import Challenge, ClassroomMember, Mission, MissionChallenge, User, XPEvent
 from app.infra.repositories.local_time import day_end, day_start
-
-FIRST_TRY_XP = 10
 
 
 @dataclass(frozen=True)
@@ -52,13 +50,9 @@ class XPRepository:
         )
         return [UserXP(*row) for row in self.session.execute(query)]
 
-    def xp_by_user_since(
-        self, since: datetime, user_ids: Iterable[int] | None = None
-    ) -> list[UserXP]:
-        users_filter = User.role == Role.STUDENT
-        if user_ids is not None:
-            users_filter = and_(users_filter, User.id.in_(list(user_ids)))
-        return self._xp_per_user(users_filter, XPEvent.created_at >= since)
+    def xp_by_user_since(self, since: datetime) -> list[UserXP]:
+        """Every student with the XP of their events since `since`."""
+        return self._xp_per_user(User.role == Role.STUDENT, XPEvent.created_at >= since)
 
     def _xp_in_classroom(self, classroom_id: int, *event_filters) -> list[UserXP]:
         """Members of the turma with the XP of events on challenges of its missions."""

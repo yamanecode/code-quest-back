@@ -154,7 +154,7 @@ def test_T_STU_ME_04_fresh_profile(client, headers):
 def test_T_STU_STREAK_01_streak_follows_solve_days_and_gives_no_xp(client, session, student, clock):
     headers = bearer(student, clock)
     mission = make_mission(session)
-    first, second = (make_challenge(session, missions=(mission,)) for _ in range(2))
+    first, second, third = (make_challenge(session, missions=(mission,)) for _ in range(3))
 
     solve(client, headers, first)
     assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (1, 10)
@@ -169,8 +169,8 @@ def test_T_STU_STREAK_01_streak_follows_solve_days_and_gives_no_xp(client, sessi
     headers = bearer(student, clock)  # log in again on the new day
     assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (0, 20)
 
-    solve(client, headers, first)  # a re-solve counts for the day but gives no XP
-    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (1, 20)
+    solve(client, headers, third)  # the streak restarts; XP still comes only from solves
+    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (1, 30)
 
 
 def test_T_STU_PUBLIC_01_settings_toggle(client, headers):

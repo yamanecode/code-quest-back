@@ -94,9 +94,7 @@ def test_T_API_ERR_04_malformed_request_body_uses_same_shape():
     response = build_client().post("/test/body", json={"wrong": 1})
 
     assert response.status_code == 422
-    body = response.json()
-    assert body["detail"] == "validation_error"
-    assert body["message"] == "Dados inválidos."
+    assert response.json() == {"detail": "validation_error", "message": "Dados inválidos."}
 
 
 def test_T_API_ERR_05_unknown_route_uses_same_shape():

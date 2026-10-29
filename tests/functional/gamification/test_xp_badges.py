@@ -3,11 +3,14 @@ import pytest
 from tests.functional.helpers import (
     STUDENT_PASSWORD,
     Account,
+    assert_error,
+    correct_answer,
     fail,
     join,
     login,
     profile,
     request_hint,
+    send,
     solve,
     turma_with_mission,
 )
@@ -41,7 +44,7 @@ def test_FT_GAME_01_xp_depends_on_wrong_answers_before_the_first_solve(
 
 @pytest.mark.req("RF-07")
 @pytest.mark.req("SG-07")
-def test_FT_GAME_02_solving_again_wrong_answers_and_hints_give_no_xp(
+def test_FT_GAME_02_wrong_answers_hints_and_solved_challenges_give_no_xp(
     professor: Account, student: Account
 ):
     turma = turma_with_mission(professor, ("ordering", "grouping"))
@@ -49,13 +52,11 @@ def test_FT_GAME_02_solving_again_wrong_answers_and_hints_give_no_xp(
     join(student, turma.join_code)
     solve(student, first)
 
-    again = solve(student, first)
-    wrong_after_solve = fail(student, first)
+    again = send(student, first, correct_answer(first["type"], first["content"]))
     hint = request_hint(student, second["id"])
     wrong = fail(student, second)
 
-    assert again["xp_earned"] == 0
-    assert wrong_after_solve["xp_earned"] == 0
+    assert_error(again, 409, "already_solved")
     assert hint.status_code == 200
     assert wrong["xp_earned"] == 0
     assert wrong["xp"] == 10

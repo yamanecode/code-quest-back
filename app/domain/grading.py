@@ -1,4 +1,4 @@
-from app.domain.challenge_types import ChallengeType, student_ids
+from app.domain.challenge_types import ChallengeType, is_text_list, student_ids
 
 
 class InvalidAnswer(Exception):
@@ -26,10 +26,6 @@ def _ids(content: dict, key: str) -> set[str]:
     return {element["id"] for element in content[key]}
 
 
-def _is_text_list(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(entry, str) for entry in value)
-
-
 def _stored_id(stored_by_shown: dict[str, str], shown: object) -> str:
     if not isinstance(shown, str) or shown not in stored_by_shown:
         raise InvalidAnswer("the answer uses an id the student was not shown")
@@ -37,7 +33,7 @@ def _stored_id(stored_by_shown: dict[str, str], shown: object) -> str:
 
 
 def answer_from_student(challenge_type: str, content: dict, seed: str, answer: object) -> object:
-    """The answer with the ids the student saw turned back into stored ids (spec 4.2).
+    """The answer with the ids the student saw turned back into stored ids (SG-08).
 
     Wrong shapes are returned unchanged so that validate_answer reports them.
     """
@@ -58,7 +54,7 @@ def answer_from_student(challenge_type: str, content: dict, seed: str, answer: o
 def validate_answer(challenge_type: str, content: dict, answer: object) -> None:
     value = _answer_value(challenge_type, answer)
     if challenge_type == ChallengeType.ORDERING:
-        if not _is_text_list(value) or sorted(value) != sorted(_ids(content, "items")):
+        if not is_text_list(value) or sorted(value) != sorted(_ids(content, "items")):
             raise InvalidAnswer("the order must list every item exactly once")
     elif challenge_type == ChallengeType.GROUPING:
         groups = _ids(content, "groups")
@@ -70,7 +66,7 @@ def validate_answer(challenge_type: str, content: dict, answer: object) -> None:
             raise InvalidAnswer("every item must be assigned to an existing group")
     elif challenge_type == ChallengeType.FILTERING:
         if (
-            not _is_text_list(value)
+            not is_text_list(value)
             or len(set(value)) != len(value)
             or not set(value) <= _ids(content, "items")
         ):

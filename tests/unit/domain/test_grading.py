@@ -24,38 +24,33 @@ PATTERN = {
 }
 
 
-def test_T_DOM_GRADE_01_ordering_exact_order_is_correct():
-    assert grade(ChallengeType.ORDERING, ORDERING, {"order": ["c", "a", "b"]})
+CONTENT = {
+    ChallengeType.ORDERING: ORDERING,
+    ChallengeType.GROUPING: GROUPING,
+    ChallengeType.FILTERING: FILTERING,
+    ChallengeType.PATTERN: PATTERN,
+}
 
 
-def test_T_DOM_GRADE_02_ordering_other_order_is_wrong():
-    assert not grade(ChallengeType.ORDERING, ORDERING, {"order": ["a", "b", "c"]})
-
-
-def test_T_DOM_GRADE_03_grouping_same_assignment_is_correct():
-    assert grade(ChallengeType.GROUPING, GROUPING, {"assignment": {"b": "g2", "a": "g1"}})
-
-
-def test_T_DOM_GRADE_04_grouping_other_assignment_is_wrong():
-    assert not grade(ChallengeType.GROUPING, GROUPING, {"assignment": {"a": "g2", "b": "g2"}})
-
-
-def test_T_DOM_GRADE_05_filtering_same_set_in_any_order_is_correct():
-    assert grade(ChallengeType.FILTERING, FILTERING, {"selected": ["c", "a"]})
-
-
-def test_T_DOM_GRADE_06_filtering_other_set_is_wrong():
-    assert not grade(ChallengeType.FILTERING, FILTERING, {"selected": ["a"]})
-    assert not grade(ChallengeType.FILTERING, FILTERING, {"selected": ["a", "b", "c"]})
-    assert not grade(ChallengeType.FILTERING, FILTERING, {"selected": []})
-
-
-def test_T_DOM_GRADE_07_pattern_correct_option():
-    assert grade(ChallengeType.PATTERN, PATTERN, {"option": "a"})
-
-
-def test_T_DOM_GRADE_08_pattern_wrong_option():
-    assert not grade(ChallengeType.PATTERN, PATTERN, {"option": "b"})
+@pytest.mark.parametrize(
+    ("challenge_type", "answer", "correct"),
+    [
+        (ChallengeType.ORDERING, {"order": ["c", "a", "b"]}, True),
+        (ChallengeType.ORDERING, {"order": ["a", "b", "c"]}, False),
+        (ChallengeType.GROUPING, {"assignment": {"b": "g2", "a": "g1"}}, True),
+        (ChallengeType.GROUPING, {"assignment": {"a": "g2", "b": "g2"}}, False),
+        (ChallengeType.FILTERING, {"selected": ["c", "a"]}, True),  # any order
+        (ChallengeType.FILTERING, {"selected": ["a"]}, False),
+        (ChallengeType.FILTERING, {"selected": ["a", "b", "c"]}, False),
+        (ChallengeType.FILTERING, {"selected": []}, False),
+        (ChallengeType.PATTERN, {"option": "a"}, True),
+        (ChallengeType.PATTERN, {"option": "b"}, False),
+    ],
+)
+def test_T_DOM_GRADE_01_correct_only_when_the_answer_equals_the_solution(
+    challenge_type, answer, correct
+):
+    assert grade(challenge_type, CONTENT[challenge_type], answer) is correct
 
 
 @pytest.mark.parametrize(
@@ -84,14 +79,14 @@ def test_T_DOM_GRADE_08_pattern_wrong_option():
         ("drawing", PATTERN, {"option": "a"}),
     ],
 )
-def test_T_DOM_GRADE_09_malformed_answers_raise(challenge_type, content, answer):
+def test_T_DOM_GRADE_02_malformed_answers_raise(challenge_type, content, answer):
     with pytest.raises(InvalidAnswer):
         validate_answer(challenge_type, content, answer)
     with pytest.raises(InvalidAnswer):
         grade(challenge_type, content, answer)
 
 
-def test_T_DOM_GRADE_09_empty_filtering_selection_is_well_formed():
+def test_T_DOM_GRADE_02_empty_filtering_selection_is_well_formed():
     validate_answer(ChallengeType.FILTERING, FILTERING, {"selected": []})
 
 
@@ -112,7 +107,7 @@ def to_shown(challenge_type: str, content: dict, seed: str, answer: dict) -> dic
         (ChallengeType.FILTERING, FILTERING, {"selected": ["a", "c"]}),
     ],
 )
-def test_T_DOM_GRADE_10_student_ids_are_mapped_back_before_grading(
+def test_T_DOM_GRADE_03_student_ids_are_mapped_back_before_grading(
     challenge_type, content, correct
 ):
     for seed in ("1:1", "1:2", "7:3"):
@@ -133,7 +128,7 @@ def test_T_DOM_GRADE_10_student_ids_are_mapped_back_before_grading(
         (ChallengeType.FILTERING, FILTERING, {"selected": [None]}),
     ],
 )
-def test_T_DOM_GRADE_11_an_id_the_student_was_not_shown_is_malformed(
+def test_T_DOM_GRADE_04_an_id_the_student_was_not_shown_is_malformed(
     challenge_type, content, answer
 ):
     with pytest.raises(InvalidAnswer):
@@ -152,7 +147,7 @@ def test_T_DOM_GRADE_11_an_id_the_student_was_not_shown_is_malformed(
         (ChallengeType.PATTERN, PATTERN, {"option": "z"}),
     ],
 )
-def test_T_DOM_GRADE_12_wrong_shapes_and_pattern_answers_pass_through_unchanged(
+def test_T_DOM_GRADE_05_wrong_shapes_and_pattern_answers_pass_through_unchanged(
     challenge_type, content, answer
 ):
     assert answer_from_student(challenge_type, content, "1:1", answer) == answer

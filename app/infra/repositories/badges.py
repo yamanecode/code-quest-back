@@ -25,9 +25,6 @@ class BadgeRepository:
             self.session.add(row)
         self.session.flush()
 
-    def list_all(self) -> list[Badge]:
-        return list(self.session.scalars(select(Badge).order_by(Badge.id)))
-
     def earned(self, user_id: int) -> dict[str, datetime]:
         """Code -> moment it was earned."""
         query = (

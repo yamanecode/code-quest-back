@@ -15,7 +15,6 @@ from app.domain.gamification import (
     goal_reached,
     goal_target,
     level_for,
-    local_date,
     mission_completed,
     month_start,
     period_start,
@@ -34,21 +33,12 @@ def days_ago(*offsets: int) -> set[date]:
     return {TODAY - timedelta(days=offset) for offset in offsets}
 
 
-def test_T_DOM_XP_01_first_try_gives_10():
-    assert xp_for_wrong_attempts(0) == 10
+@pytest.mark.parametrize(("wrong", "xp"), [(0, 10), (1, 5), (2, 5), (3, 2), (40, 2)])
+def test_T_DOM_XP_01_xp_by_wrong_attempts_before_the_solve(wrong, xp):
+    assert xp_for_wrong_attempts(wrong) == xp
 
 
-def test_T_DOM_XP_02_one_wrong_attempt_gives_5():
-    assert xp_for_wrong_attempts(1) == 5
-
-
-def test_T_DOM_XP_03_two_wrong_attempts_give_5():
-    assert xp_for_wrong_attempts(2) == 5
-
-
-def test_T_DOM_XP_04_three_or_more_wrong_attempts_give_2():
-    assert xp_for_wrong_attempts(3) == 2
-    assert xp_for_wrong_attempts(40) == 2
+def test_T_DOM_XP_02_negative_attempts_are_rejected():
     with pytest.raises(ValueError):
         xp_for_wrong_attempts(-1)
 
@@ -61,24 +51,18 @@ def test_T_DOM_LEVEL_02_xp_to_next_level():
     assert [xp_to_next_level(xp) for xp in (0, 1, 49, 50, 280)] == [50, 49, 1, 50, 20]
 
 
-def test_T_DOM_TITLE_01_levels_1_and_2_are_aprendiz():
-    assert title_for(1) == title_for(2) == "Aprendiz"
-
-
-def test_T_DOM_TITLE_02_levels_3_and_4_are_explorador():
-    assert title_for(3) == title_for(4) == "Explorador(a)"
-
-
-def test_T_DOM_TITLE_03_levels_5_to_7_are_estrategista():
-    assert title_for(5) == title_for(7) == "Estrategista"
-
-
-def test_T_DOM_TITLE_04_levels_8_to_10_are_arquiteto():
-    assert title_for(8) == title_for(10) == "Arquiteto(a) de soluções"
-
-
-def test_T_DOM_TITLE_05_level_11_and_above_is_mestre():
-    assert title_for(11) == title_for(40) == "Mestre do pensamento"
+@pytest.mark.parametrize(
+    ("levels", "title"),
+    [
+        ((1, 2), "Aprendiz"),
+        ((3, 4), "Explorador(a)"),
+        ((5, 7), "Estrategista"),
+        ((8, 10), "Arquiteto(a) de soluções"),
+        ((11, 40), "Mestre do pensamento"),
+    ],
+)
+def test_T_DOM_TITLE_01_title_by_level_band(levels, title):
+    assert {title_for(level) for level in levels} == {title}
 
 
 def test_T_DOM_STREAK_01_streak_ending_today():
@@ -96,14 +80,6 @@ def test_T_DOM_STREAK_03_a_missed_day_resets_the_streak():
 
 def test_T_DOM_STREAK_04_no_solves_means_no_streak():
     assert streak(set(), TODAY) == 0
-
-
-def test_T_DOM_STREAK_05_days_are_counted_in_sao_paulo_time():
-    late_evening = datetime(2026, 10, 20, 2, 30, tzinfo=UTC)
-    assert local_date(late_evening) == date(2026, 10, 19)
-    assert local_date(datetime(2026, 10, 20, 3, 0, tzinfo=UTC)) == date(2026, 10, 20)
-    with pytest.raises(ValueError):
-        local_date(datetime(2026, 10, 20, 12, 0))
 
 
 def test_T_DOM_RANK_01_week_starts_monday_midnight_in_sao_paulo():

@@ -33,24 +33,20 @@ def hint_ok(student: Account, challenge_id: int) -> dict:
 
 
 @pytest.mark.req("RF-12")
-def test_FT_AI_01_hint_levels_increase_and_hints_left_decreases(
+def test_FT_AI_01_hint_levels_increase_and_hints_never_run_out(
     professor: Account, student: Account
 ):
     turma = turma_with_mission(professor, ("ordering",))
     challenge_id = turma.challenges[0]["id"]
     join(student, turma.join_code)
-    assert challenge_view(student, challenge_id)["hints_left"] == 5
 
     hints = [hint_ok(student, challenge_id)]
-    for _ in range(3):
+    for _ in range(5):
         wait_cooldown(hints[-1]["cooldown_seconds"])
         hints.append(hint_ok(student, challenge_id))
-    levels = [hint["level"] for hint in hints]
-    left = [hint["hints_left"] for hint in hints]
 
-    assert levels == [1, 2, 3, 3]
-    assert left == [4, 3, 2, 1]
-    assert challenge_view(student, challenge_id)["hints_left"] == 1
+    assert [hint["level"] for hint in hints] == [1, 2, 3, 3, 3, 3]
+    assert "hints_left" not in challenge_view(student, challenge_id)
 
 
 @pytest.mark.req("RF-12")
@@ -69,26 +65,9 @@ def test_FT_AI_02_request_before_the_wait_returns_429(professor: Account, studen
     assert early.headers["Retry-After"] == str(body["retry_after"])
     view = challenge_view(student, challenge_id)
     assert 1 <= view["cooldown_seconds_left"] <= first["cooldown_seconds"]
-    assert view["hints_left"] == 4
 
     wait_cooldown(body["retry_after"])
-    second = hint_ok(student, challenge_id)
-    assert (second["level"], second["hints_left"]) == (2, 3)
-
-
-@pytest.mark.req("RF-12")
-@pytest.mark.req("SG-04")
-def test_FT_AI_03_sixth_requested_hint_returns_409(professor: Account, student: Account):
-    turma = turma_with_mission(professor, ("filtering",))
-    challenge_id = turma.challenges[0]["id"]
-    join(student, turma.join_code)
-    for _ in range(5):
-        body = hint_ok(student, challenge_id)
-        wait_cooldown(body["cooldown_seconds"])
-    assert body["hints_left"] == 0
-
-    assert_error(request_hint(student, challenge_id), 409, "hint_cap_reached")
-    assert challenge_view(student, challenge_id)["hints_left"] == 0
+    assert hint_ok(student, challenge_id)["level"] == 2
 
 
 @pytest.mark.req("RF-12")
@@ -118,10 +97,9 @@ def test_FT_AI_05_first_wrong_answer_brings_one_automatic_hint(
 
     assert first["is_correct"] is False
     assert isinstance(first["hint"], str) and first["hint"].strip()
-    assert (view["hints_left"], view["cooldown_seconds_left"]) == (5, 0)
+    assert view["cooldown_seconds_left"] == 0
     assert [result["hint"] for result in later] == [None, None]
     assert len(prompts) == 1
     assert appears_in_order(prompts[0], [texts[item] for item in answer["order"]])
 
-    requested = hint_ok(student, challenge["id"])
-    assert (requested["level"], requested["hints_left"]) == (1, 4)
+    assert hint_ok(student, challenge["id"])["level"] == 1

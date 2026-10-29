@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_EXPIRE_HOURS: int = 8
     FRONTEND_ORIGIN: str = "http://localhost:3000"
-    HINT_CAP: int = 5
     HINT_COOLDOWN_SECONDS: int = 15
     LLM_PROVIDER: str = "fake"
     LLM_BASE_URL: str = ""

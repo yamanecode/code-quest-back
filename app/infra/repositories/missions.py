@@ -39,10 +39,6 @@ class MissionRepository:
         query = select(Mission).where(Mission.classroom_id.is_(None), Mission.title == title)
         return self.session.scalar(query)
 
-    def list_base(self) -> list[Mission]:
-        query = select(Mission).where(Mission.classroom_id.is_(None))
-        return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
-
     def list_for_classroom(self, classroom_id: int) -> list[Mission]:
         query = select(Mission).where(Mission.classroom_id == classroom_id)
         return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))

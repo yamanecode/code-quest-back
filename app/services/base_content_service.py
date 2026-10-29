@@ -5,29 +5,19 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.domain.badges import BADGES
-from app.domain.challenge_types import ChallengeType
+from app.domain.challenge_types import ChallengeDraft, challenge_errors
 from app.domain.content import mission_errors
-from app.domain.enums import ContentStatus, Origin, Role
+from app.domain.enums import Origin, Role
 from app.infra.db.models import User
 from app.infra.repositories.badges import BadgeRepository
-from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.users import UserRepository
-from app.services.content_service import ChallengeDraft, rule_errors
+from app.services.content_service import MissionDraft, add_published_mission
 from app.services.exceptions import Conflict, ValidationFailed
 
 SYSTEM_USERNAME = "codequest"
 # Not a bcrypt hash, so no password ever matches it and the account cannot log in.
 UNUSABLE_HASH = "!"
-
-
-@dataclass(frozen=True)
-class BaseMission:
-    file_name: str
-    title: str
-    description: str | None
-    position: int
-    challenges: list[ChallengeDraft]
 
 
 @dataclass
@@ -48,14 +38,14 @@ def _read_challenge(raw: object, where: str, errors: list[str]) -> ChallengeDraf
         content=raw.get("content"),
         explanation=raw.get("explanation"),
     )
-    problems = rule_errors(draft)
+    problems = challenge_errors(draft)
     if problems:
         errors.append(f"{where} «{draft.title}»: " + " ".join(problems))
         return None
     return draft
 
 
-def _read_mission(path: Path, errors: list[str]) -> BaseMission | None:
+def _read_mission(path: Path, errors: list[str]) -> MissionDraft | None:
     name = path.name
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -83,16 +73,16 @@ def _read_mission(path: Path, errors: list[str]) -> BaseMission | None:
     ]
     if problems or len(errors) > before:
         return None
-    return BaseMission(name, data["title"], data.get("description"), position, challenges)
+    return MissionDraft(data["title"], data.get("description"), position, challenges)
 
 
-def read_base_dir(directory: Path) -> list[BaseMission]:
+def read_base_dir(directory: Path) -> list[MissionDraft]:
     """Read and validate every base mission file; any problem rejects the whole directory."""
     paths = sorted(directory.glob("*.json"))
     if not paths:
         raise ValidationFailed(errors=[f"Nenhum arquivo .json encontrado em {directory}."])
     errors: list[str] = []
-    missions: list[BaseMission] = []
+    missions: list[MissionDraft] = []
     titles: set[str] = set()
     for path in paths:
         mission = _read_mission(path, errors)
@@ -114,7 +104,6 @@ class BaseContentService:
         self.session = session
         self.users = UserRepository(session)
         self.missions = MissionRepository(session)
-        self.challenges = ChallengeRepository(session)
 
     def load(self, directory: Path) -> LoadReport:
         missions = read_base_dir(directory)
@@ -126,7 +115,7 @@ class BaseContentService:
             if self.missions.get_base_by_title(mission.title):
                 report.skipped.append(mission.title)
                 continue
-            self._add_mission(owner.id, mission)
+            add_published_mission(self.session, owner.id, mission, Origin.BASE)
             report.created.append(mission.title)
         self.session.commit()
         return report
@@ -142,25 +131,3 @@ class BaseContentService:
                 f"O nome de usuário {SYSTEM_USERNAME} já pertence a outra conta.",
             )
         return user
-
-    def _add_mission(self, owner_id: int, mission: BaseMission) -> None:
-        row = self.missions.add(
-            title=mission.title,
-            position=mission.position,
-            description=mission.description,
-            status=ContentStatus.PUBLISHED,
-        )
-        challenge_ids = [
-            self.challenges.add(
-                owner_id=owner_id,
-                title=draft.title,
-                statement=draft.statement,
-                challenge_type=ChallengeType(draft.type),
-                content=draft.content,
-                explanation=draft.explanation,
-                origin=Origin.BASE,
-                status=ContentStatus.PUBLISHED,
-            ).id
-            for draft in mission.challenges
-        ]
-        self.missions.set_challenges(row.id, challenge_ids)

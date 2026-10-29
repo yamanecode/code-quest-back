@@ -8,17 +8,17 @@ REQUIREMENTS_MD = textwrap.dedent(
     r"""
     # Requirements
 
-    | ID | Phase | Requirement | Acceptance |
-    |---|---|---|---|
-    | RF-01 | 3 | Sign-up | Returns 201 for `a\|b` input. |
-    | RF-09 | 6 | Rankings | `scope=global|classroom` and `period=week|month` work. |
-    | SG-11 | 5 | Game elements | MANUAL: inspect the screens. |
+    | ID | Requirement | Acceptance |
+    |---|---|---|
+    | RF-01 | Sign-up | Returns 201 for `a\|b` input. |
+    | RF-09 | Rankings | `scope=global|classroom` and `period=week|month` work. |
+    | SG-11 | Game elements | MANUAL: inspect the screens. |
 
     ## Non-functional
 
-    | ID | Phase | Requirement | Acceptance |
-    |---|---|---|---|
-    | RNF-05 | 0 | Errors in Portuguese | Every error has `detail` and `message`. |
+    | ID | Requirement | Acceptance |
+    |---|---|---|
+    | RNF-05 | Errors in Portuguese | Every error has `detail` and `message`. |
     """
 )
 
@@ -36,7 +36,7 @@ def test_T_TRACE_01_parser_reads_every_table_and_handles_pipes():
     assert rf09.requirement == "Rankings"
     assert rf09.acceptance == "`scope=global|classroom` and `period=week|month` work."
     assert sg11.manual and not rf01.manual
-    assert rnf05.phase == "0"
+    assert rnf05.requirement == "Errors in Portuguese"
 
 
 def test_T_TRACE_01_parser_reads_the_real_requirements_file():
@@ -44,7 +44,7 @@ def test_T_TRACE_01_parser_reads_the_real_requirements_file():
 
     ids = requirement_ids(requirements)
     assert len(ids) == len(set(ids))
-    assert {"RF-01", "RF-22", "SG-13", "RNF-05"} <= set(ids)
+    assert {"RF-01", "RF-22", "SG-14", "RNF-05"} <= set(ids)
 
 
 def test_T_TRACE_02_requirement_without_test_is_missing():

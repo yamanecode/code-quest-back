@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from app.domain.challenge_types import ChallengeType, template_rules
+from app.domain.challenge_types import ChallengeDraft, ChallengeType, template_rules
+from app.domain.draft_rules import draft_rules
 from app.services.prompts import (
     LEVEL_INSTRUCTIONS,
-    ChallengeText,
     draft_prompt,
     hint_prompt,
     review_prompt,
@@ -15,8 +15,8 @@ from tests.samples import CONTENT, WRONG_ANSWER
 STATEMENT = "Coloque os passos na ordem certa para resolver o problema."
 
 
-def challenge(challenge_type: ChallengeType) -> ChallengeText:
-    return ChallengeText(
+def challenge(challenge_type: ChallengeType) -> ChallengeDraft:
+    return ChallengeDraft(
         type=challenge_type,
         title="Desafio de exemplo",
         statement=STATEMENT,
@@ -144,11 +144,12 @@ def test_T_AI_PROMPT_05b_draft_prompt_has_type_topic_rules_schema_and_examples(c
 
     assert f"Tipo: {challenge_type.value}" in prompt.user
     assert "Tema: receitas de bolo" in prompt.user
-    for rule in template_rules(challenge_type):
+    for rule in [*template_rules(challenge_type), *draft_rules(challenge_type)]:
         assert rule in prompt.user
     assert '"solution"' in prompt.user
     assert json.dumps(example.content, ensure_ascii=False) in prompt.user
     assert "JSON" in prompt.system
+    assert "14 a 16 anos" in prompt.system
 
 
 def test_T_AI_PROMPT_05c_draft_prompt_without_examples_and_with_previous_errors():

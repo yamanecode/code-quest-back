@@ -109,7 +109,6 @@ Invoke-Step "load-base (second load)" { uv run python -m app.cli load-base conte
 # 3. Server settings for the functional run.
 $env:LLM_PROVIDER = "fake"
 $env:FAKE_LLM_LOG = Join-Path $Root "docs/evidence/fake-llm.jsonl"
-$env:HINT_CAP = "5"
 $env:HINT_COOLDOWN_SECONDS = "2"
 $env:FUNCTIONAL_BASE_URL = $BaseUrl
 Remove-Item $env:FAKE_LLM_LOG -ErrorAction SilentlyContinue

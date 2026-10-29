@@ -42,10 +42,10 @@ Settings are read from environment variables or from `.env` (never committed; se
 | `JWT_SECRET` | | Secret used to sign the access tokens |
 | `JWT_EXPIRE_HOURS` | `8` | Token lifetime |
 | `FRONTEND_ORIGIN` | | The only origin allowed by CORS |
-| `HINT_CAP` | `5` | Requested hints per student and challenge |
-| `HINT_COOLDOWN_SECONDS` | `15` | Minimum time between two requested hints |
+| `HINT_COOLDOWN_SECONDS` | `15` | Minimum time between two requested hints (there is no cap on how many) |
 | `LLM_PROVIDER` | `fake` | `fake` (deterministic answers, no network) or `openai_compatible` |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | | Endpoint, model and key for `openai_compatible` |
+| `LLM_REASONING_EFFORT` | | Optional `reasoning_effort` sent to reasoning models (e.g. `low`), so hidden reasoning does not use up the reply |
 | `FAKE_LLM_LOG` | | When set, the fake provider appends every prompt it receives to this file |
 | `CODEQUEST_PROFESSOR_PASSWORD` | | Password used by `create-professor` and `seed-demo`; prompted when empty |
 
@@ -125,7 +125,7 @@ No test ever calls a real language model. `tests/live` holds an optional check a
 ### Quality gate
 
 ```
-powershell -File scripts/check.ps1 -Phase <n>
+powershell -File scripts/check.ps1
 ```
 
 Runs `ruff check`, `ruff format --check`, `lint-imports`, `alembic check`, the internal tests with coverage and the 100 % coverage check of `app/domain`. Reports are written to `docs/evidence/`.

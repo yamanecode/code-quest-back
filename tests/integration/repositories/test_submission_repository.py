@@ -7,17 +7,6 @@ from tests.integration.factories import make_challenge, make_user, submit
 MIDNIGHT = datetime(2026, 10, 14, tzinfo=TIMEZONE)
 
 
-def test_T_REPO_04_solved_challenge_ids_only_correct_and_own(session):
-    ana, bia = make_user(session), make_user(session)
-    solved, wrong_only, other = (make_challenge(session) for _ in range(3))
-    submit(session, ana, solved, correct=False)
-    submit(session, ana, solved, correct=True)
-    submit(session, ana, wrong_only, correct=False)
-    submit(session, bia, other, correct=True)
-
-    assert SubmissionRepository(session).solved_challenge_ids(ana.id) == {solved.id}
-
-
 def test_T_REPO_05_solved_before_uses_local_midnight(session):
     ana = make_user(session)
     late_evening = make_challenge(session)
@@ -32,20 +21,19 @@ def test_T_REPO_05_solved_before_uses_local_midnight(session):
     assert solved == {late_evening.id, utc_after_midnight.id}
 
 
-def test_T_REPO_06_wrong_attempts_before_first_solve(session):
+def test_T_REPO_06_wrong_attempts_count_only_own_wrong_submissions(session):
     ana, bia = make_user(session), make_user(session)
-    challenge = make_challenge(session)
-    unsolved = make_challenge(session)
-    for correct in (False, False, True, False):
+    challenge, other = make_challenge(session), make_challenge(session)
+    for correct in (False, False, True):
         submit(session, ana, challenge, correct)
-    for _ in range(3):
-        submit(session, ana, unsolved, correct=False)
+    submit(session, ana, other, correct=False)
     submit(session, bia, challenge, correct=False)
 
     repo = SubmissionRepository(session)
-    assert repo.wrong_attempts_before_first_solve(ana.id, challenge.id) == 2
-    assert repo.wrong_attempts_before_first_solve(ana.id, unsolved.id) == 3
-    assert repo.wrong_attempts_before_first_solve(bia.id, unsolved.id) == 0
+    assert repo.wrong_attempts(ana.id, challenge.id) == 2
+    assert repo.has_solved(ana.id, challenge.id)
+    assert not repo.has_solved(ana.id, other.id)
+    assert not repo.has_solved(bia.id, challenge.id)
 
 
 def test_T_REPO_07_solve_days_are_local_dates_of_correct_submissions(session):

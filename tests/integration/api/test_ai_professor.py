@@ -17,7 +17,7 @@ from tests.integration.factories import (
     make_mission,
     make_user,
 )
-from tests.samples import CONTENT, WRONG_ANSWER
+from tests.samples import CONTENT, DRAFT_CONTENT, WRONG_ANSWER
 
 pytestmark = pytest.mark.usefixtures("badge_catalog")
 
@@ -34,19 +34,18 @@ def headers(professor, clock):
     return bearer(professor, clock)
 
 
+STEPS = [item["text"] for item in DRAFT_CONTENT[ChallengeType.ORDERING]["items"]]
+
+
 def draft_reply(**overrides) -> str:
     """A model answer in the expected format, with ids the backend must rename."""
     draft = {
-        "title": "Fazer um bolo",
-        "statement": "Coloque os passos para fazer um bolo na ordem certa.",
-        "explanation": "Primeiro se mistura, depois se assa.",
+        "title": "Arroz soltinho",
+        "statement": "Coloque os passos para preparar o arroz na ordem em que funcionam.",
+        "explanation": "Cada passo usa o resultado do anterior.",
         "content": {
-            "items": [
-                {"id": "x1", "text": "Misturar os ingredientes"},
-                {"id": "x2", "text": "Levar ao forno"},
-                {"id": "x3", "text": "Esperar esfriar"},
-            ],
-            "solution": ["x1", "x2", "x3"],
+            "items": [{"id": f"x{n}", "text": text} for n, text in enumerate(STEPS, start=1)],
+            "solution": [f"x{n}" for n in range(1, len(STEPS) + 1)],
         },
     }
     draft.update(overrides)
@@ -137,14 +136,12 @@ def test_T_AI_DRAFT_01_valid_reply_is_saved_as_ai_draft_with_canonical_ids(
     assert response.status_code == 201
     body = response.json()
     assert (body["status"], body["origin"], body["type"]) == ("draft", "ai", "ordering")
-    assert body["title"] == "Fazer um bolo"
+    assert body["title"] == "Arroz soltinho"
     assert body["content"] == {
         "items": [
-            {"id": "a", "text": "Misturar os ingredientes"},
-            {"id": "b", "text": "Levar ao forno"},
-            {"id": "c", "text": "Esperar esfriar"},
+            {"id": letter, "text": text} for letter, text in zip("abcde", STEPS, strict=True)
         ],
-        "solution": ["a", "b", "c"],
+        "solution": list("abcde"),
     }
     assert session.get(Challenge, body["id"]).origin == "ai"
     assert "Tema: receitas de bolo" in llm.prompts[0].user
@@ -176,6 +173,32 @@ def test_T_AI_DRAFT_02b_retry_with_the_errors_can_succeed(client, session, heade
 
     assert request_draft(client, headers).status_code == 201
     assert challenge_count(session) == 1
+
+
+def test_T_AI_DRAFT_07_too_easy_twice_is_422_and_the_retry_names_the_rules(
+    client, session, headers, llm
+):
+    three_steps = {
+        "items": [{"id": letter, "text": text} for letter, text in zip("abc", STEPS, strict=False)],
+        "solution": ["a", "b", "c"],
+    }
+    llm.replies.extend([draft_reply(content=three_steps)] * 2)
+
+    response = request_draft(client, headers)
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == ["Fácil demais: use pelo menos 5 passos."]
+    assert "Fácil demais: use pelo menos 5 passos." in llm.prompts[1].user
+    assert challenge_count(session) == 0
+
+
+def test_T_AI_DRAFT_07b_a_too_easy_draft_can_be_fixed_on_the_retry(client, session, headers, llm):
+    cued = json.loads(draft_reply())
+    cued["content"]["items"][0]["text"] = "Primeiro, lavar o arroz"
+    llm.replies.extend([json.dumps(cued, ensure_ascii=False), draft_reply()])
+
+    assert request_draft(client, headers).status_code == 201
+    assert "começar com uma palavra ou número que indique a ordem" in llm.prompts[1].user
 
 
 def test_T_AI_DRAFT_03_prompt_has_at_most_3_published_examples_of_same_type_and_professor(

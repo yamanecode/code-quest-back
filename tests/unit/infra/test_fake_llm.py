@@ -4,19 +4,28 @@ import pytest
 
 from app.core.ports import LLMError
 from app.domain.challenge_types import (
+    ChallengeDraft,
     ChallengeType,
     assign_item_ids,
+    challenge_errors,
     validate_challenge,
-    validate_content,
 )
+from app.domain.draft_rules import draft_rule_errors
 from app.domain.hint_leak import hint_reveals_solution
 from app.infra.llm.fake import FAKE_REVIEW, FakeLLMClient
-from app.services.prompts import ChallengeText, draft_prompt, hint_prompt, review_prompt
+from app.services.prompts import draft_prompt, hint_prompt, review_prompt
 from tests.samples import CONTENT
 
 
-def challenge(challenge_type: ChallengeType, statement: str) -> ChallengeText:
-    return ChallengeText(challenge_type, "Título", statement, CONTENT[challenge_type])
+def challenge(challenge_type: ChallengeType, statement: str) -> ChallengeDraft:
+    return ChallengeDraft("Título", statement, challenge_type, CONTENT[challenge_type])
+
+
+def saved_draft(challenge_type: ChallengeType, reply: dict) -> ChallengeDraft:
+    content = assign_item_ids(challenge_type, reply["content"])
+    return ChallengeDraft(
+        reply["title"], reply["statement"], challenge_type, content, reply["explanation"]
+    )
 
 
 def ask(fake: FakeLLMClient, prompt) -> str:
@@ -61,9 +70,9 @@ def test_T_AI_FAKE_03_draft_is_valid_json_for_the_type_and_uses_the_topic(challe
 
     draft = json.loads(ask(fake, draft_prompt(challenge_type, "feira de ciências", [])))
 
-    content = assign_item_ids(challenge_type, draft["content"])
-    assert validate_content(challenge_type, content) == []
-    assert validate_challenge(draft["title"], draft["statement"], draft["explanation"]) == []
+    saved = saved_draft(challenge_type, draft)
+    assert challenge_errors(saved) == []
+    assert draft_rule_errors(saved) == []
     assert "feira de ciências" in draft["title"]
     assert "feira de ciências" in draft["statement"]
 
@@ -74,6 +83,16 @@ def test_T_AI_FAKE_03b_long_topic_still_gives_a_valid_title():
     draft = json.loads(ask(fake, draft_prompt(ChallengeType.PATTERN, "x" * 200, [])))
 
     assert validate_challenge(draft["title"], draft["statement"], draft["explanation"]) == []
+
+
+def test_T_AI_FAKE_03d_easy_trigger_passes_the_template_but_breaks_the_draft_rules():
+    fake = FakeLLMClient()
+
+    reply = ask(fake, draft_prompt(ChallengeType.ORDERING, "tema [fake:easy]", []))
+
+    saved = saved_draft(ChallengeType.ORDERING, json.loads(reply))
+    assert challenge_errors(saved) == []
+    assert draft_rule_errors(saved) != []
 
 
 def test_T_AI_FAKE_03c_invalid_trigger_returns_text_that_is_not_json():

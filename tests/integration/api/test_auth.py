@@ -31,19 +31,15 @@ def test_T_AUTH_01_register_creates_student(client, session):
     assert stored_user(session, "aluna.01").role == Role.STUDENT
 
 
-def test_T_AUTH_01_register_accepts_only_username_and_password(client):
+def test_T_AUTH_01_register_accepts_only_username_and_password(client, session):
     response = client.post(
         "/api/auth/register",
         json={"username": "aluna", "password": PASSWORD, "join_code": "ABC123"},
     )
-
-    assert response.status_code == 422
-    assert response.json()["errors"] == ["body.join_code"]
-
-
-def test_T_AUTH_01_register_schema_has_only_username_and_password(client):
     schema = client.get("/openapi.json").json()["components"]["schemas"]["Credentials"]
 
+    assert response.status_code == 422
+    assert session.scalar(select(User)) is None
     assert set(schema["properties"]) == {"username", "password"}
 
 
@@ -78,7 +74,7 @@ def test_T_AUTH_04_missing_fields_are_rejected(client):
     response = client.post("/api/auth/register", json={"username": "aluna"})
 
     assert response.status_code == 422
-    assert response.json()["errors"] == ["body.password"]
+    assert response.json() == {"detail": "validation_error", "message": "Dados inválidos."}
 
 
 def test_T_AUTH_05_login_returns_bearer_token(client):

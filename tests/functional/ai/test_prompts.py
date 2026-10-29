@@ -107,10 +107,8 @@ def test_FT_AI_11_hint_with_the_solution_is_replaced_by_the_fallback(
     body = response.json()
     assert not leaks(body["hint"], challenge["content"])
     assert body["hint"] != FAKE_HINT_LEVEL_1
-    assert (body["level"], body["hints_left"]) == (1, 4)
+    assert body["level"] == 1
     assert len(llm_log.since(mark)) >= 2, "the leaking hint was not retried"
-    view = student.client.get(f"/api/challenges/{challenge['id']}").json()
-    assert view["hints_left"] == 4
 
 
 @pytest.mark.req("SG-06")

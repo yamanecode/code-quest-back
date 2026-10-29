@@ -166,7 +166,7 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
             "options": last.content["options"],
         },
         "solved": False,
-        "hints_left": 5,
+        "explanation": None,
         "cooldown_seconds_left": 0,
     }
 
@@ -277,7 +277,9 @@ def test_T_STU_VIEW_03_submissions_are_stored_with_the_stored_ids(
 
 @pytest.fixture
 def challenge(session):
-    return make_challenge(session, missions=(make_mission(session),))
+    return make_challenge(
+        session, missions=(make_mission(session),), explanation="A ordem segue a contagem."
+    )
 
 
 def test_T_STU_SUBMIT_01_first_try_gives_10(client, session, student, headers, challenge):
@@ -297,32 +299,31 @@ def test_T_STU_SUBMIT_01_first_try_gives_10(client, session, student, headers, c
     assert session.scalar(select(XPEvent.amount).filter_by(user_id=student.id)) == 10
 
 
-@pytest.mark.parametrize(("wrong", "xp"), [(1, 5), (2, 5)])
-def test_T_STU_SUBMIT_02_after_one_or_two_wrong_gives_5(client, headers, challenge, wrong, xp):
+@pytest.mark.parametrize(("wrong", "xp"), [(1, 5), (2, 5), (3, 2), (6, 2)])
+def test_T_STU_SUBMIT_02_xp_by_wrong_answers_before_the_solve(
+    client, headers, challenge, wrong, xp
+):
     for _ in range(wrong):
         miss(client, headers, challenge)
 
     assert solve(client, headers, challenge).json()["xp_earned"] == xp
 
 
-@pytest.mark.parametrize("wrong", [3, 6])
-def test_T_STU_SUBMIT_03_after_three_or_more_wrong_gives_2(client, headers, challenge, wrong):
-    for _ in range(wrong):
-        miss(client, headers, challenge)
-
-    assert solve(client, headers, challenge).json()["xp_earned"] == 2
-
-
-def test_T_STU_SUBMIT_04_solving_again_gives_nothing(client, session, student, headers, challenge):
+def test_T_STU_SUBMIT_04_a_solved_challenge_is_closed(
+    client, session, student, headers, challenge, llm
+):
     solve(client, headers, challenge)
-    miss(client, headers, challenge)
 
-    again = solve(client, headers, challenge).json()
+    responses = [solve(client, headers, challenge), miss(client, headers, challenge)]
 
-    assert again["is_correct"] is True
-    assert (again["xp_earned"], again["xp"]) == (0, 10)
+    for response in responses:
+        assert response.status_code == 409
+        assert response.json()["detail"] == "already_solved"
+    assert rows(session, Submission, user_id=student.id) == 1
     assert rows(session, XPEvent, user_id=student.id) == 1
-    assert rows(session, Submission, user_id=student.id) == 3
+    assert llm.prompts == []
+    view = client.get(f"/api/challenges/{challenge.id}", headers=headers).json()
+    assert (view["solved"], view["explanation"]) == (True, "A ordem segue a contagem.")
 
 
 def test_T_STU_SUBMIT_05_wrong_answer_is_stored_without_xp(
@@ -409,17 +410,6 @@ def test_T_STU_SUBMIT_08_level_up_when_crossing_100_xp(client, session, student,
     )
     assert "level_3" in {badge["code"] for badge in body["new_badges"]}
     assert solve(client, headers, after).json()["level_up"] is False
-
-
-@pytest.mark.parametrize("challenge_type", list(ChallengeType))
-def test_T_STU_SUBMIT_09_grading_per_type_through_the_api(client, session, headers, challenge_type):
-    challenge = make_challenge(
-        session, challenge_type=challenge_type, missions=(make_mission(session),)
-    )
-
-    assert miss(client, headers, challenge).json()["is_correct"] is False
-    assert miss(client, headers, challenge).json()["is_correct"] is False
-    assert solve(client, headers, challenge).json()["is_correct"] is True
 
 
 # Daily challenge

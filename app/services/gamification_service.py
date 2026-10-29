@@ -164,7 +164,8 @@ class GamificationService:
 
     def award_new_badges(self, user_id: int) -> list[BadgeInfo]:
         """Awards every badge whose condition became true; the caller commits."""
-        new_codes = badge_codes_earned(self._stats(user_id)) - set(self.badges.earned(user_id))
+        stats = self._stats(user_id, self.level_info(user_id).level)
+        new_codes = badge_codes_earned(stats) - set(self.badges.earned(user_id))
         if new_codes:
             self.badges.award(user_id, new_codes, self.clock.now())
         return [
@@ -175,8 +176,8 @@ class GamificationService:
 
     def profile(self, user_id: int) -> Profile:
         user = self.users.get(user_id)
-        stats = self._stats(user_id)
         progress = self.level_info(user_id)
+        stats = self._stats(user_id, progress.level)
         earned = self.badges.earned(user_id)
         return Profile(
             username=user.username,
@@ -305,7 +306,7 @@ class GamificationService:
         without_hints = [ids for ids in completed if hinted.isdisjoint(ids)]
         return len(completed), len(without_hints)
 
-    def _stats(self, user_id: int) -> BadgeStats:
+    def _stats(self, user_id: int, level: int) -> BadgeStats:
         today = self.clock.today()
         by_type = self.xp.first_solves_by_type(user_id)
         completed, completed_without_hints = self._completed_missions(user_id)
@@ -315,7 +316,7 @@ class GamificationService:
             missions_completed=completed,
             missions_completed_without_hints=completed_without_hints,
             streak=streak(self.submissions.solve_days(user_id), today),
-            level=level_for(self.xp.xp_total(user_id)),
+            level=level,
             first_try_solves=self.xp.first_try_solves(user_id),
             dailies_solved=self.daily.dailies_solved(user_id),
             goals_contributed=self.classrooms.goals_contributed(user_id),

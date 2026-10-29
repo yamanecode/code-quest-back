@@ -283,21 +283,38 @@ def test_FT_STU_10_no_student_response_contains_the_solution(
 
 
 @pytest.mark.req("SG-08")
-def test_FT_STU_11_explanation_only_after_a_correct_answer(professor: Account, student: Account):
+def test_FT_STU_11_explanation_only_once_solved(professor: Account, student: Account):
     turma = turma_with_mission(professor, ("grouping",))
     challenge = turma.challenges[0]
     join(student, turma.join_code)
 
-    view = student.client.get(f"/api/challenges/{challenge['id']}").json()
+    before = student.client.get(f"/api/challenges/{challenge['id']}").json()
     wrong = fail(student, challenge)
     right = solve(student, challenge)
+    after = student.client.get(f"/api/challenges/{challenge['id']}").json()
 
-    assert not has_key(view, "explanation")
+    assert before["explanation"] is None
     assert wrong["explanation"] is None
     assert right["explanation"] == challenge["explanation"]
-    assert not has_key(
-        student.client.get(f"/api/challenges/{challenge['id']}").json(), "explanation"
-    )
+    assert (after["solved"], after["explanation"]) == (True, challenge["explanation"])
+
+
+@pytest.mark.req("RF-06")
+def test_FT_STU_14_a_solved_challenge_takes_no_more_answers_or_hints(
+    professor: Account, student: Account
+):
+    turma = turma_with_mission(professor, ("ordering",))
+    challenge = turma.challenges[0]
+    join(student, turma.join_code)
+    solve(student, challenge)
+
+    right_again = send(student, challenge, correct_answer("ordering", challenge["content"]))
+    wrong_after = send(student, challenge, wrong_answer("ordering", challenge["content"]))
+    hint = request_hint(student, challenge["id"])
+
+    for response in (right_again, wrong_after, hint):
+        assert_error(response, 409, "already_solved")
+    assert profile(student)["xp"] == 10
 
 
 @pytest.mark.req("RF-05")

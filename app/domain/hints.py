@@ -9,10 +9,6 @@ def hint_level(requested_shown: int) -> int:
     return min(requested_shown + 1, HINT_MAX_LEVEL)
 
 
-def hints_left(cap: int, requested_shown: int) -> int:
-    return max(cap - requested_shown, 0)
-
-
 def cooldown_left(last_shown_at: datetime | None, now: datetime, cooldown_seconds: int) -> int:
     """Whole seconds until another hint may be requested; 0 means it may be requested now."""
     if last_shown_at is None:

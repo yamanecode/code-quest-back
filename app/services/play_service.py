@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.core.config import get_settings
 from app.domain.challenge_types import SKILL_LABELS, to_student_view
-from app.domain.gamification import daily_pick, xp_for_wrong_attempts
+from app.domain.gamification import daily_pick, level_for, title_for, xp_for_wrong_attempts
 from app.domain.grading import InvalidAnswer, answer_from_student, grade
 from app.infra.db.models import Challenge, Mission
 from app.infra.repositories.challenges import ChallengeRepository
@@ -18,7 +18,7 @@ from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
 from app.services.ai_service import AIService
 from app.services.classroom_service import ClassroomService
-from app.services.exceptions import NotFound, ValidationFailed
+from app.services.exceptions import Conflict, NotFound, ValidationFailed
 from app.services.gamification_service import BadgeInfo, GamificationService
 
 
@@ -72,7 +72,7 @@ class StudentChallenge:
     skill: str
     content: dict
     solved: bool
-    hints_left: int
+    explanation: str | None
     cooldown_seconds_left: int
 
 
@@ -100,6 +100,10 @@ def view_seed(challenge_id: int, user_id: int) -> str:
     key = get_settings().JWT_SECRET.encode()
     message = f"student-view:{challenge_id}:{user_id}".encode()
     return hmac.new(key, message, hashlib.sha256).hexdigest()
+
+
+def _already_solved() -> Conflict:
+    return Conflict("already_solved", "Você já resolveu este desafio.")
 
 
 def _summary(challenge: Challenge, solved_ids: set[int]) -> ChallengeSummary:
@@ -172,7 +176,7 @@ class PlayService:
     def get_challenge(self, user_id: int, challenge_id: int) -> StudentChallenge:
         challenge = self._visible_challenge(user_id, challenge_id)
         view = to_student_view(challenge.type, challenge.content, view_seed(challenge.id, user_id))
-        hints = self.ai.hint_status(user_id, challenge_id)
+        solved = self.submissions.has_solved(user_id, challenge_id)
         return StudentChallenge(
             id=challenge.id,
             title=challenge.title,
@@ -180,13 +184,16 @@ class PlayService:
             type=view["type"],
             skill=view["skill"],
             content=view["content"],
-            solved=challenge.id in self.submissions.solved_challenge_ids(user_id),
-            hints_left=hints.hints_left,
-            cooldown_seconds_left=hints.cooldown_seconds_left,
+            solved=solved,
+            # Shown again once solved, so a closed challenge can still be reviewed.
+            explanation=challenge.explanation if solved else None,
+            cooldown_seconds_left=self.ai.cooldown_seconds_left(user_id, challenge_id),
         )
 
     def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
         challenge = self._visible_challenge(user_id, challenge_id)
+        if self.submissions.has_solved(user_id, challenge_id):
+            raise _already_solved()
         seed = view_seed(challenge.id, user_id)
         try:
             # From here on the answer uses stored ids: storage, grading and the hint prompt.
@@ -194,38 +201,35 @@ class PlayService:
             is_correct = grade(challenge.type, challenge.content, answer)
         except InvalidAnswer as error:
             raise ValidationFailed("invalid_answer", "Resposta em formato inválido.") from error
-        already_solved = challenge_id in self.submissions.solved_challenge_ids(user_id)
-        first_solve = is_correct and not already_solved
         before = self.gamification.level_info(user_id)
         now = self.clock.now()
 
         self.submissions.add(user_id, challenge_id, answer, is_correct, now)
         xp_earned = 0
-        if first_solve:
-            wrong = self.submissions.wrong_attempts_before_first_solve(user_id, challenge_id)
-            xp_earned = xp_for_wrong_attempts(wrong)
-            self.xp.add(user_id, challenge_id, xp_earned, now)
         new_badges = []
         hint = None
-        if not is_correct:
-            hint = self.ai.hint_after_wrong(user_id, challenge, answer)
         if is_correct:
+            wrong = self.submissions.wrong_attempts(user_id, challenge_id)
+            xp_earned = xp_for_wrong_attempts(wrong)
+            self.xp.add(user_id, challenge_id, xp_earned, now)
             # Goal rewards first, so a class_goal badge is among the submitter's new badges.
             self.goals.reward_completed_goals(user_id, challenge_id)
             new_badges = self.gamification.award_new_badges(user_id)
-        explanation = challenge.explanation if is_correct else None
+        else:
+            hint = self.ai.hint_after_wrong(user_id, challenge, answer)
         self.session.commit()
 
-        after = self.gamification.level_info(user_id)
+        xp = before.xp + xp_earned
+        level = level_for(xp)
         return SubmissionResult(
             is_correct=is_correct,
             xp_earned=xp_earned,
-            xp=after.xp,
-            level=after.level,
-            title=after.title,
-            level_up=after.level > before.level,
+            xp=xp,
+            level=level,
+            title=title_for(level),
+            level_up=level > before.level,
             new_badges=new_badges,
-            explanation=explanation,
+            explanation=challenge.explanation if is_correct else None,
             hint=hint,
         )
 

@@ -118,3 +118,16 @@ def test_FT_AI_12_draft_stays_hidden_from_students_until_published(
     shown = [c["id"] for c in student.client.get(mission_path).json()["challenges"]]
     assert created["id"] in shown
     assert student.client.get(f"/api/challenges/{created['id']}").status_code == 200
+
+
+@pytest.mark.req("SG-14")
+def test_FT_AI_16_a_too_easy_draft_is_rejected_with_the_broken_rules(professor: Account):
+    before = own_ids(professor)
+
+    easy = draft(professor, "ordering", "[fake:easy] rotina da manhã")
+    good = draft(professor, "ordering", "rotina da manhã")
+
+    body = assert_error(easy, 422, "invalid_draft")
+    assert any(error.startswith("Fácil demais") for error in body["errors"])
+    assert good.status_code == 201, good.text
+    assert own_ids(professor) == before | {good.json()["id"]}

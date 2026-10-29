@@ -59,5 +59,5 @@ _LEAK_RULES: dict[str, Callable[[dict, str], bool]] = {
 
 
 def hint_reveals_solution(challenge_type: str, content: dict, hint: str) -> bool:
-    """True when the hint contains the solution (spec 4.4); suggestions are not detected."""
+    """True when the hint contains the solution (SG-03); suggestions are not detected."""
     return _LEAK_RULES[challenge_type](content, normalize(hint))

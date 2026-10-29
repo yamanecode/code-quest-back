@@ -1,8 +1,5 @@
-# Phase gate: lint, layer contracts, migrations and internal tests with coverage.
-# Usage: powershell -File scripts/check.ps1 -Phase <n>
-param(
-    [Parameter(Mandatory = $true)][int]$Phase
-)
+# Quality gate: lint, layer contracts, migrations and internal tests with coverage.
+# Usage: powershell -File scripts/check.ps1
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -23,9 +20,7 @@ Invoke-Step "ruff check" { uv run ruff check . }
 Invoke-Step "ruff format --check" { uv run ruff format --check . }
 Invoke-Step "lint-imports" { uv run lint-imports }
 
-if ($Phase -ge 2) {
-    Invoke-Step "alembic check" { uv run alembic check }
-}
+Invoke-Step "alembic check" { uv run alembic check }
 
 $TestDirs = @(@("tests/unit", "tests/integration") | Where-Object { Test-Path $_ })
 Invoke-Step "internal tests" {
@@ -34,11 +29,9 @@ Invoke-Step "internal tests" {
         --cov=app --cov-report=term --cov-report=xml:docs/evidence/coverage.xml
 }
 
-if ($Phase -ge 1) {
-    Invoke-Step "domain coverage 100 %" {
-        uv run coverage report --include="app/domain/*" --show-missing --fail-under=100
-    }
+Invoke-Step "domain coverage 100 %" {
+    uv run coverage report --include="app/domain/*" --show-missing --fail-under=100
 }
 
 Write-Host ""
-Write-Host "Phase $Phase gate passed." -ForegroundColor Green
+Write-Host "Quality gate passed." -ForegroundColor Green

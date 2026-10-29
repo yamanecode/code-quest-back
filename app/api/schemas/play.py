@@ -47,14 +47,13 @@ class ChallengeForStudentOut(BaseModel):
     skill: str
     content: dict
     solved: bool
-    hints_left: int
+    explanation: str | None
     cooldown_seconds_left: int
 
 
 class HintOut(BaseModel):
     hint: str
     level: int
-    hints_left: int
     cooldown_seconds: int
 
 

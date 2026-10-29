@@ -320,3 +320,22 @@ def test_FT_PROF_10_everything_can_change_before_any_answer(professor: Account):
 
     assert response.status_code == 200, response.text
     assert payload_of(response.json()) == changed
+
+
+@pytest.mark.req("RF-03")
+def test_FT_PROF_11_missions_are_reordered_in_one_request(professor: Account):
+    classroom = new_classroom(professor)
+    first, second, third = (new_mission(professor, classroom["id"], []) for _ in range(3))
+    url = f"/api/professor/classrooms/{classroom['id']}/missions"
+
+    reordered = professor.client.put(
+        f"{url}/order", json={"mission_ids": [third["id"], first["id"], second["id"]]}
+    )
+    incomplete = professor.client.put(f"{url}/order", json={"mission_ids": [first["id"]]})
+
+    assert reordered.status_code == 200, reordered.text
+    expected = [(third["id"], 0), (first["id"], 1), (second["id"], 2)]
+    assert [(m["id"], m["position"]) for m in reordered.json()] == expected
+    assert_error(incomplete, 422)
+    listed = professor.client.get(url).json()
+    assert [m["id"] for m in listed] == [third["id"], first["id"], second["id"]]

@@ -12,7 +12,7 @@ def normalize_username(raw: str) -> str:
 
 
 def account_errors(username: object, password: object) -> list[str]:
-    """Rules for an already normalized username and a password (spec §3)."""
+    """Rules for an already normalized username and a password (RF-01)."""
     errors = []
     if not isinstance(username, str) or not USERNAME_PATTERN.fullmatch(username):
         errors.append(

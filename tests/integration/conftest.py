@@ -9,7 +9,6 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_clock, get_llm_client
-from app.core.clock import FixedClock
 from app.core.config import get_settings
 from app.domain.badges import BADGES
 from app.infra.db.models import Base
@@ -17,6 +16,7 @@ from app.infra.db.session import get_session
 from app.infra.llm.fake import FakeLLMClient
 from app.infra.repositories.badges import BadgeRepository
 from app.main import create_app
+from tests.fixed_clock import FixedClock
 from tests.integration.factories import NOON
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"

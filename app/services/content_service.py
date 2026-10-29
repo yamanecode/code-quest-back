@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.domain.challenge_types import (
     SKILL_LABELS,
+    ChallengeDraft,
     ChallengeType,
+    challenge_errors,
     structure_changed,
-    validate_challenge,
-    validate_content,
 )
 from app.domain.content import (
     JOIN_CODE_ALPHABET,
@@ -65,17 +65,6 @@ class MissionView:
 
 
 @dataclass(frozen=True)
-class ChallengeDraft:
-    """What the professor sends when creating or editing a challenge."""
-
-    title: str
-    statement: str
-    type: str
-    content: dict
-    explanation: str | None
-
-
-@dataclass(frozen=True)
 class SolveStatsView:
     attempted: int
     solved: int
@@ -96,12 +85,7 @@ class ChallengeView:
     solve_stats: SolveStatsView
 
 
-def rule_errors(draft: ChallengeDraft) -> list[str]:
-    field_errors = validate_challenge(draft.title, draft.statement, draft.explanation)
-    return field_errors + validate_content(draft.type, draft.content)
-
-
-def _draft_of(challenge: Challenge) -> ChallengeDraft:
+def draft_of(challenge: Challenge) -> ChallengeDraft:
     return ChallengeDraft(
         challenge.title,
         challenge.statement,
@@ -109,6 +93,47 @@ def _draft_of(challenge: Challenge) -> ChallengeDraft:
         challenge.content,
         challenge.explanation,
     )
+
+
+@dataclass(frozen=True)
+class MissionDraft:
+    title: str
+    description: str | None
+    position: int
+    challenges: list[ChallengeDraft]
+
+
+def add_published_mission(
+    session: Session,
+    owner_id: int,
+    draft: MissionDraft,
+    origin: Origin,
+    classroom_id: int | None = None,
+) -> None:
+    """Store a mission and its challenges, all published, in the given order (seed and base)."""
+    missions = MissionRepository(session)
+    challenges = ChallengeRepository(session)
+    mission = missions.add(
+        title=draft.title,
+        position=draft.position,
+        classroom_id=classroom_id,
+        description=draft.description,
+        status=ContentStatus.PUBLISHED,
+    )
+    rows = [
+        challenges.add(
+            owner_id=owner_id,
+            title=challenge.title,
+            statement=challenge.statement,
+            challenge_type=ChallengeType(challenge.type),
+            content=challenge.content,
+            explanation=challenge.explanation,
+            origin=origin,
+            status=ContentStatus.PUBLISHED,
+        )
+        for challenge in draft.challenges
+    ]
+    missions.set_challenges(mission.id, [row.id for row in rows])
 
 
 def _challenge_not_found() -> NotFound:
@@ -321,7 +346,7 @@ class ContentService:
         mission_id: int | None = None,
     ) -> ChallengeView:
         """Save a new draft challenge; with `mission_id` it is also added at the mission's end."""
-        _check(rule_errors(draft))
+        _check(challenge_errors(draft))
         if mission_id is not None:
             self._own_mission(professor_id, mission_id)
         challenge = self.challenges.add(
@@ -342,12 +367,16 @@ class ContentService:
     def get_challenge(self, professor_id: int, challenge_id: int) -> ChallengeView:
         return self._challenge_view(self._own_challenge(professor_id, challenge_id))
 
+    def get_draft(self, professor_id: int, challenge_id: int) -> ChallengeDraft:
+        """Only the challenge's own data, for the AI review."""
+        return draft_of(self._own_challenge(professor_id, challenge_id))
+
     def update_challenge(
         self, professor_id: int, challenge_id: int, draft: ChallengeDraft
     ) -> ChallengeView:
         challenge = self._own_challenge(professor_id, challenge_id)
         # Rules first: structure_changed expects well-formed content.
-        _check(rule_errors(draft))
+        _check(challenge_errors(draft))
         if self.challenges.has_submissions(challenge_id) and (
             draft.type != challenge.type
             or structure_changed(draft.type, challenge.content, draft.content)
@@ -390,7 +419,7 @@ class ContentService:
 
     def publish_challenge(self, professor_id: int, challenge_id: int) -> ChallengeView:
         challenge = self._own_challenge(professor_id, challenge_id)
-        _check(rule_errors(_draft_of(challenge)))
+        _check(challenge_errors(draft_of(challenge)))
         return self._set_challenge_status(challenge, ContentStatus.PUBLISHED)
 
     def unpublish_challenge(self, professor_id: int, challenge_id: int) -> ChallengeView:
@@ -414,7 +443,7 @@ class ContentService:
             explanation=challenge.explanation,
             status=challenge.status,
             origin=challenge.origin,
-            locked=self.challenges.has_submissions(challenge.id),
+            locked=stats.attempted > 0,
             solve_stats=SolveStatsView(stats.attempted, stats.solved),
         )
 

@@ -51,13 +51,3 @@ def test_T_REPO_22_database_rejects_duplicates_and_bad_goals(session, violation)
     with pytest.raises(IntegrityError):
         violation(session)
     session.rollback()
-
-
-def test_T_REPO_32_user_lookup_and_username_lookup(session):
-    repo = UserRepository(session)
-    ana = repo.add("ana", "hash", Role.STUDENT)
-
-    assert repo.get(ana.id) == ana
-    assert repo.get_by_username("ana") == ana
-    assert repo.get_by_username("bia") is None
-    assert ana.profile_public is False

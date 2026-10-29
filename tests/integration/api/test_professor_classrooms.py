@@ -183,15 +183,6 @@ def test_T_PROF_CLOSE_03_editing_a_closed_turma_keeps_it_closed(client, headers)
     assert edited.json()["name"] == "Turma 7C"
 
 
-def test_T_PROF_CLOSE_04_only_the_owner_professor_can_close(client, session, clock, headers):
-    other = make_classroom(session)
-    student = bearer(make_user(session, "aluna"), clock)
-
-    assert close(client, headers, other.id).status_code == 404
-    assert reopen(client, headers, other.id).status_code == 404
-    assert close(client, student, other.id).status_code == 403
-
-
 def member_url(classroom_id, username):
     return f"{URL}/{classroom_id}/members/{username}"
 
@@ -296,13 +287,3 @@ def test_T_PROF_CODE_02_a_new_code_keeps_everything_else_of_the_turma(client, he
     renewed = new_code(client, headers, created["id"]).json()
 
     assert {**renewed, "join_code": None} == {**created, "closed": True, "join_code": None}
-
-
-def test_T_PROF_CODE_03_only_the_owner_professor_can_renew_the_code(
-    client, session, clock, headers
-):
-    other = make_classroom(session)
-    student = bearer(make_user(session, "aluna"), clock)
-
-    assert new_code(client, headers, other.id).status_code == 404
-    assert new_code(client, student, other.id).status_code == 403

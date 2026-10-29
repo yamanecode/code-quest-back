@@ -49,11 +49,9 @@ async def handle_service_error(request: Request, exc: ServiceError) -> JSONRespo
 
 
 async def handle_request_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-    # Field names only: echoing the input back could leak a password into the response.
-    fields = [".".join(str(part) for part in error["loc"]) for error in exc.errors()]
-    body = error_body("validation_error", "Dados inválidos.")
-    body["errors"] = fields
-    return JSONResponse(body, status_code=422)
+    # Only a request the interface would never build gets here, so a plain message is enough;
+    # echoing the input back could also leak a password into the response.
+    return JSONResponse(error_body("validation_error", "Dados inválidos."), status_code=422)
 
 
 async def handle_http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:

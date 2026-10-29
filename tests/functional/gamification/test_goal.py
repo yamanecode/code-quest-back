@@ -43,7 +43,6 @@ def test_FT_GAME_12_each_first_solve_of_a_member_adds_one(professor: Account, ne
     steps = [
         (lambda: solve(alice, first), 1),
         (lambda: solve(bruno, first), 2),
-        (lambda: solve(alice, first), 2),
         (lambda: fail(alice, second), 2),
         (lambda: solve(alice, second), 3),
     ]

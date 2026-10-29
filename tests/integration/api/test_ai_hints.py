@@ -60,22 +60,16 @@ def hint_events(session, student) -> list[HintEvent]:
     return list(session.scalars(query))
 
 
-def test_T_AI_HINT_01_returns_level_1_hint_and_decrements_hints_left(
+def test_T_AI_HINT_01_returns_level_1_hint_and_starts_the_cooldown(
     client, session, student, headers, challenge, llm, clock
 ):
     llm.replies.append(SAFE_HINT)
-    before = view(client, headers, challenge)
-    assert (before["hints_left"], before["cooldown_seconds_left"]) == (5, 0)
+    assert view(client, headers, challenge)["cooldown_seconds_left"] == 0
 
     response = ask_hint(client, headers, challenge)
 
     assert response.status_code == 200
-    assert response.json() == {
-        "hint": SAFE_HINT,
-        "level": 1,
-        "hints_left": 4,
-        "cooldown_seconds": 15,
-    }
+    assert response.json() == {"hint": SAFE_HINT, "level": 1, "cooldown_seconds": 15}
     [event] = hint_events(session, student)
     assert (event.source, event.level, event.text, event.discarded_count) == (
         HintSource.REQUEST,
@@ -84,8 +78,7 @@ def test_T_AI_HINT_01_returns_level_1_hint_and_decrements_hints_left(
         0,
     )
     clock.advance(timedelta(seconds=10))
-    shown = view(client, headers, challenge)
-    assert (shown["hints_left"], shown["cooldown_seconds_left"]) == (4, 5)
+    assert view(client, headers, challenge)["cooldown_seconds_left"] == 5
 
 
 def test_T_AI_HINT_02_levels_go_1_2_3_3_and_previous_hints_reach_the_prompt(
@@ -100,24 +93,22 @@ def test_T_AI_HINT_02_levels_go_1_2_3_3_and_previous_hints_reach_the_prompt(
         clock.advance(COOLDOWN)
 
     assert [b["level"] for b in bodies] == [1, 2, 3, 3]
-    assert [b["hints_left"] for b in bodies] == [4, 3, 2, 1]
     assert "Nível da dica: 3" in llm.prompts[3].user
     for earlier in texts[:3]:
         assert earlier in llm.prompts[3].user
 
 
-def test_T_AI_HINT_CAP_sixth_request_is_refused(client, headers, challenge, llm, clock):
-    llm.replies.extend([SAFE_HINT] * 6)
-    for _ in range(5):
-        assert ask_hint(client, headers, challenge).status_code == 200
+def test_T_AI_HINT_07_requested_hints_have_no_cap(client, headers, challenge, llm, clock):
+    llm.replies.extend([SAFE_HINT] * 7)
+
+    levels = []
+    for _ in range(7):
+        response = ask_hint(client, headers, challenge)
+        assert response.status_code == 200
+        levels.append(response.json()["level"])
         clock.advance(COOLDOWN)
 
-    response = ask_hint(client, headers, challenge)
-
-    assert response.status_code == 409
-    assert response.json()["detail"] == "hint_cap_reached"
-    assert len(llm.prompts) == 5
-    assert view(client, headers, challenge)["hints_left"] == 0
+    assert levels == [1, 2, 3, 3, 3, 3, 3]
 
 
 def test_T_AI_HINT_COOL_request_inside_the_wait_is_429_then_allowed(
@@ -148,7 +139,6 @@ def test_T_AI_HINT_03_leaking_hint_retried_strictly_then_fallback(
 
     assert response.status_code == 200
     assert response.json()["hint"] == FALLBACK_HINTS[ChallengeType.ORDERING][1]
-    assert response.json()["hints_left"] == 4
     assert "foi descartada" not in llm.prompts[0].user
     assert "foi descartada" in llm.prompts[1].user
     [event] = hint_events(session, student)
@@ -164,7 +154,7 @@ def test_T_AI_HINT_03b_strict_retry_can_succeed(client, session, student, header
     assert hint_events(session, student)[0].discarded_count == 1
 
 
-def test_T_AI_HINT_04_first_wrong_answer_gets_a_hint_outside_the_cap(
+def test_T_AI_HINT_04_first_wrong_answer_gets_a_hint_that_raises_no_level(
     client, session, student, headers, challenge, llm
 ):
     llm.replies.extend(["Confira o que vem primeiro. Qual passo abre a sequência?", SAFE_HINT])
@@ -177,8 +167,7 @@ def test_T_AI_HINT_04_first_wrong_answer_gets_a_hint_outside_the_cap(
     assert "Ordem enviada: três → dois → um" in llm.prompts[0].user
     assert "Nível da dica: 1" in llm.prompts[0].user
     assert len(llm.prompts) == 1
-    shown = view(client, headers, challenge)
-    assert (shown["hints_left"], shown["cooldown_seconds_left"]) == (5, 0)
+    assert view(client, headers, challenge)["cooldown_seconds_left"] == 0
     [event] = hint_events(session, student)
     assert (event.source, event.level) == (HintSource.AFTER_WRONG, 1)
     # No cooldown started, and the automatic hint is passed on as already shown.
@@ -231,7 +220,6 @@ def test_T_AI_FALLBACK_01_model_failure_gives_the_fallback_hint(
 
     assert response.status_code == 200
     assert response.json()["hint"] == FALLBACK_HINTS[challenge_type][1]
-    assert response.json()["hints_left"] == 4
 
 
 def test_T_AI_FALLBACK_01b_empty_reply_and_failure_after_wrong_give_fallbacks(

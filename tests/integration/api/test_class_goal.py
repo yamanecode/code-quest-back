@@ -63,7 +63,6 @@ def test_T_STU_GOAL_01_progress_counts_members_first_solves_this_week(client, se
     base = make_challenge(session, missions=(make_mission(session),))
 
     solve(client, clock, ana, first)
-    solve(client, clock, ana, first)  # a re-solve is not a first solve
     solve(client, clock, ana, base)  # base game challenges are not the turma's
     solve(client, clock, bia, second)
     first_solve(session, outsider, second)  # a former member: their history stays, uncounted
