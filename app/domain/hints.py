@@ -9,6 +9,12 @@ def hint_level(requested_shown: int) -> int:
     return min(requested_shown + 1, HINT_MAX_LEVEL)
 
 
+def pick_variant(variants: tuple[str, ...], shown: list[str]) -> str:
+    """The first variant not shown yet; once all were shown, the one shown longest ago."""
+    last_shown = {text: position for position, text in enumerate(shown)}
+    return min(variants, key=lambda text: last_shown.get(text, -1))
+
+
 def cooldown_left(last_shown_at: datetime | None, now: datetime, cooldown_seconds: int) -> int:
     """Whole seconds until another hint may be requested; 0 means it may be requested now."""
     if last_shown_at is None:

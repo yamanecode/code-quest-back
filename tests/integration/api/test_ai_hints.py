@@ -1,4 +1,5 @@
 from datetime import timedelta
+from itertools import pairwise
 
 import pytest
 from sqlalchemy import select
@@ -138,11 +139,11 @@ def test_T_AI_HINT_03_leaking_hint_retried_strictly_then_fallback(
     response = ask_hint(client, headers, challenge)
 
     assert response.status_code == 200
-    assert response.json()["hint"] == FALLBACK_HINTS[ChallengeType.ORDERING][1]
+    assert response.json()["hint"] == FALLBACK_HINTS[ChallengeType.ORDERING][1][0]
     assert "foi descartada" not in llm.prompts[0].user
     assert "foi descartada" in llm.prompts[1].user
     [event] = hint_events(session, student)
-    assert (event.text, event.discarded_count) == (FALLBACK_HINTS[ChallengeType.ORDERING][1], 2)
+    assert (event.text, event.discarded_count) == (FALLBACK_HINTS[ChallengeType.ORDERING][1][0], 2)
 
 
 def test_T_AI_HINT_03b_strict_retry_can_succeed(client, session, student, headers, challenge, llm):
@@ -219,7 +220,7 @@ def test_T_AI_FALLBACK_01_model_failure_gives_the_fallback_hint(
     response = ask_hint(client, headers, challenge)
 
     assert response.status_code == 200
-    assert response.json()["hint"] == FALLBACK_HINTS[challenge_type][1]
+    assert response.json()["hint"] == FALLBACK_HINTS[challenge_type][1][0]
 
 
 def test_T_AI_FALLBACK_01b_empty_reply_and_failure_after_wrong_give_fallbacks(
@@ -230,23 +231,24 @@ def test_T_AI_FALLBACK_01b_empty_reply_and_failure_after_wrong_give_fallbacks(
     requested = ask_hint(client, headers, challenge).json()
     automatic = submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING]).json()
 
-    assert requested["hint"] == FALLBACK_HINTS[ChallengeType.ORDERING][1]
-    assert automatic["hint"] == FALLBACK_HINTS[ChallengeType.ORDERING][1]
+    assert requested["hint"] in FALLBACK_HINTS[ChallengeType.ORDERING][1]
+    assert automatic["hint"] in FALLBACK_HINTS[ChallengeType.ORDERING][1]
 
 
 def test_T_AI_FALLBACK_01c_every_fallback_hint_is_safe_and_ends_with_a_question():
     assert set(FALLBACK_HINTS) == set(ChallengeType)
     for challenge_type, levels in FALLBACK_HINTS.items():
         assert set(levels) == {1, 2, 3}
-        for text in levels.values():
-            assert text.endswith("?")
-            assert not hint_reveals_solution(challenge_type, CONTENT[challenge_type], text)
+        for variants in levels.values():
+            assert len(variants) == len(set(variants)) >= 2
+            for text in variants:
+                assert text.endswith("?")
+                assert not hint_reveals_solution(challenge_type, CONTENT[challenge_type], text)
 
 
 def test_T_AI_FALLBACK_04_fallback_matching_the_answer_is_replaced_by_a_neutral_hint(
-    client, session, headers, llm
+    client, session, headers, llm, monkeypatch
 ):
-    # The level-1 pattern fallback mentions "termo"; here that word is the correct option.
     challenge = make_challenge(
         session, challenge_type=ChallengeType.PATTERN, missions=(make_mission(session),)
     )
@@ -261,12 +263,64 @@ def test_T_AI_FALLBACK_04_fallback_matching_the_answer_is_replaced_by_a_neutral_
         "solution": "a",
     }
     session.flush()
-    assert hint_reveals_solution(
-        ChallengeType.PATTERN, challenge.content, FALLBACK_HINTS[ChallengeType.PATTERN][1]
-    )
+    only_leaking = ("Compare cada termo com o anterior. O que mudou?",)
+    monkeypatch.setitem(FALLBACK_HINTS[ChallengeType.PATTERN], 1, only_leaking)
+    assert hint_reveals_solution(ChallengeType.PATTERN, challenge.content, only_leaking[0])
     llm.replies.append(LLMError("down"))
 
     hint = ask_hint(client, headers, challenge).json()["hint"]
 
     assert hint == NEUTRAL_HINT
     assert not hint_reveals_solution(ChallengeType.PATTERN, challenge.content, hint)
+
+
+def test_T_AI_FALLBACK_05_leaking_variant_is_skipped_for_a_safe_one(
+    client, session, headers, llm, monkeypatch
+):
+    challenge = make_challenge(
+        session, challenge_type=ChallengeType.PATTERN, missions=(make_mission(session),)
+    )
+    challenge.content = {
+        "sequence": ["x", "y", "x"],
+        "options": [
+            {"id": i, "text": t} for i, t in zip("abcd", ["termo", "y", "z", "w"], strict=True)
+        ],
+        "solution": "a",
+    }
+    session.flush()
+    pool = ("Compare cada termo com o anterior. O que mudou?", "Qual regra se repete?")
+    monkeypatch.setitem(FALLBACK_HINTS[ChallengeType.PATTERN], 1, pool)
+    llm.replies.append(LLMError("down"))
+
+    assert ask_hint(client, headers, challenge).json()["hint"] == pool[1]
+
+
+def test_T_AI_FALLBACK_06_automatic_and_first_requested_hint_are_different(
+    client, headers, challenge, llm
+):
+    llm.replies.extend([LLMError("down"), LLMError("down")])
+
+    automatic = submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING]).json()
+    requested = ask_hint(client, headers, challenge).json()
+
+    assert requested["level"] == 1
+    assert automatic["hint"] != requested["hint"]
+    assert {automatic["hint"], requested["hint"]} == set(FALLBACK_HINTS[ChallengeType.ORDERING][1])
+
+
+def test_T_AI_FALLBACK_07_level_3_rotates_through_its_variants_and_then_cycles(
+    client, headers, challenge, llm, clock
+):
+    llm.replies.extend([LLMError("down")] * 8)
+    shown = []
+
+    for _ in range(8):
+        shown.append(ask_hint(client, headers, challenge).json()["hint"])
+        clock.advance(COOLDOWN)
+
+    level_3 = FALLBACK_HINTS[ChallengeType.ORDERING][3]
+    assert shown[:2] == list(FALLBACK_HINTS[ChallengeType.ORDERING][1][:1]) + list(
+        FALLBACK_HINTS[ChallengeType.ORDERING][2][:1]
+    )
+    assert shown[2:] == [level_3[i % len(level_3)] for i in range(6)]
+    assert all(a != b for a, b in pairwise(shown[2:]))

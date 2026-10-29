@@ -17,7 +17,7 @@ from app.domain.content import draft_topic_errors
 from app.domain.draft_rules import draft_rule_errors
 from app.domain.enums import HintSource, Origin
 from app.domain.hint_leak import hint_reveals_solution
-from app.domain.hints import cooldown_left, hint_level
+from app.domain.hints import cooldown_left, hint_level, pick_variant
 from app.infra.db.models import Challenge
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.hints import HintRepository
@@ -45,38 +45,99 @@ REVIEW_MAX_TOKENS = 1500
 DRAFT_MAX_TOKENS = 1200
 DRAFT_ATTEMPTS = 2
 
-FALLBACK_HINTS = {
+# Generic per type, never about one challenge. Level 1 is also the pool of the automatic hint.
+# Each pool has several variants so the same sentence is not shown twice in a row.
+FALLBACK_HINTS: dict[ChallengeType, dict[int, tuple[str, ...]]] = {
     ChallengeType.ORDERING: {
-        1: "Leia o enunciado de novo: qual é o objetivo final? Que passo precisa vir antes de "
-        "todos os outros?",
-        2: "Escolha um par de passos e pergunte: algum depende do outro já estar pronto? "
-        "Qual deve vir antes?",
-        3: "Para ir à escola, primeiro você acorda, depois se veste e só então sai de casa. "
-        "Quais passos do desafio também dependem de outro já estar feito?",
+        1: (
+            "Leia o enunciado de novo: qual é o objetivo final? Que passo precisa vir antes de "
+            "todos os outros?",
+            "Pense no resultado final. Qual passo só faz sentido depois de todos os outros, e "
+            "qual não precisa de nenhum antes dele?",
+        ),
+        2: (
+            "Escolha um par de passos e pergunte: algum depende do outro já estar pronto? "
+            "Qual deve vir antes?",
+            "Pegue dois passos vizinhos e troque-os de lugar na cabeça. A sequência ainda "
+            "funciona? Se não, qual dos dois precisa vir primeiro?",
+        ),
+        3: (
+            "Para ir à escola, primeiro você acorda, depois se veste e só então sai de casa. "
+            "Quais passos do desafio também dependem de outro já estar feito?",
+            "Num sanduíche, o pão vem antes do recheio e comer fica por último. Comece pelo "
+            "passo que não depende de nada e pelo que só pode ser o final. Que passos do "
+            "desafio ficam no meio, entre esses dois?",
+            "Em molhar o cabelo, passar xampu e enxaguar, cada passo só faz sentido depois do "
+            "anterior. Que passos do desafio só fazem sentido depois de outro?",
+        ),
     },
     ChallengeType.GROUPING: {
-        1: "Olhe para cada etapa e pense no que ela precisa realizar. Que tipo de tarefa "
-        "combina com cada uma?",
-        2: "Pegue uma tarefa por vez e pergunte em qual etapa ela ajuda a chegar ao objetivo. "
-        "Alguma etapa ficou sem tarefas?",
-        3: "Numa festa, comprar balões faz parte de preparar, e cortar o bolo faz parte da "
-        "festa em si. Em que momento acontece cada tarefa do desafio?",
+        1: (
+            "Olhe para cada grupo e pense no que ele representa. Que tipo de tarefa combina "
+            "com cada um?",
+            "Antes de distribuir, imagine uma tarefa que claramente pertence a cada grupo. "
+            "Quais tarefas do desafio se parecem com ela?",
+        ),
+        2: (
+            "Pegue uma tarefa por vez e pergunte a qual grupo ela ajuda mais. Algum grupo "
+            "ficou sem tarefas?",
+            "Comece pelas tarefas mais fáceis de encaixar; as que sobrarem ficam mais fáceis "
+            "de decidir. No fim, algum grupo ficou vazio?",
+        ),
+        3: (
+            "Numa festa, comprar balões faz parte de preparar, e cortar o bolo faz parte da "
+            "festa em si. A qual grupo do desafio cada tarefa se parece mais?",
+            "Num trabalho escolar, pesquisar o tema ajuda a produzir a pesquisa e montar os "
+            "slides ajuda a produzir a apresentação. Que resultado cada tarefa do desafio "
+            "ajuda a produzir?",
+            "Se uma tarefa parece caber em dois grupos, qual deles ficaria incompleto sem ela?",
+        ),
     },
     ChallengeType.FILTERING: {
-        1: "Releia a pergunta com atenção: o que exatamente ela quer saber? Quais informações "
-        "ajudam a responder isso?",
-        2: "Para cada informação, pergunte: se ela sumisse, eu ainda conseguiria responder? "
-        "Quais são indispensáveis?",
-        3: "Para saber se dá tempo de ver um filme, importam o horário de início e a duração, "
-        "não a cor da poltrona. Quais informações do desafio mudam a resposta?",
+        1: (
+            "Releia a pergunta com atenção: o que exatamente ela quer saber? Quais informações "
+            "ajudam a responder isso?",
+            "Imagine a resposta já escrita. Quais informações você teria usado para chegar a ela?",
+        ),
+        2: (
+            "Para cada informação, pergunte: se ela sumisse, eu ainda conseguiria responder? "
+            "Quais são indispensáveis?",
+            "Separe as informações em duas colunas: as que mudam a resposta e as que só "
+            "enfeitam. Em qual coluna cada uma entra?",
+        ),
+        3: (
+            "Para saber quantas pizzas pedir para 8 pessoas, a conta usa o número de pessoas "
+            "e as fatias de cada uma; sabor e marca não entram. Que informações do desafio "
+            "entrariam na sua conta?",
+            "Para saber se dá tempo de ver um filme, importam o horário de início e a "
+            "duração, não a cor da poltrona. Quais informações do desafio mudam a resposta?",
+            "Uma informação pode parecer inútil e ser necessária, ou parecer importante e não "
+            "servir. Testando cada uma contra a pergunta, e não contra o assunto, quais sobram?",
+        ),
     },
     ChallengeType.PATTERN: {
-        1: "Compare cada termo com o anterior: o que mudou de um para o outro? Essa mudança "
-        "se repete?",
-        2: "Descubra a regra que transforma um termo no seguinte e teste-a em todos os pares. "
-        "Ela funciona sempre?",
-        3: "Em círculo, quadrado, círculo, quadrado, a regra é alternar, então o próximo é "
-        "círculo. Qual regra se repete na sequência do desafio?",
+        1: (
+            "Compare cada termo com o anterior: o que mudou de um para o outro? Essa mudança "
+            "se repete?",
+            "Escreva a diferença entre cada par de termos seguidos. Ela é sempre igual? Se "
+            "não, ela mesma segue alguma regra?",
+        ),
+        2: (
+            "Descubra a regra que transforma um termo no seguinte e teste-a em todos os pares. "
+            "Ela funciona sempre?",
+            "Se a regra falha em algum par, talvez a sequência tenha duas regras alternadas, "
+            "uma nas posições ímpares e outra nas pares, ou use os dois termos anteriores. "
+            "Qual dessas ideias funciona?",
+        ),
+        3: (
+            "Em círculo, quadrado, círculo, quadrado, a regra é alternar, então o próximo é "
+            "círculo. Qual regra se repete na sequência do desafio?",
+            "Em 1, 2, 4, 7 a regra está nas diferenças: +1, +2, +3. Que regra aparece nas "
+            "diferenças da sequência do desafio?",
+            "Em 1, 3, 2, 4, 3, 5 os números sobem e descem, mas olhando só os de posição "
+            "ímpar e só os de posição par aparece uma regra simples em cada grupo. Isso "
+            "ajuda aqui?",
+        ),
     },
 }
 
@@ -198,10 +259,12 @@ class AIService:
             if not hint_reveals_solution(challenge.type, challenge.content, reply):
                 return reply, discarded
             discarded += 1
-        fallback = FALLBACK_HINTS[challenge.type][level]
-        if hint_reveals_solution(challenge.type, challenge.content, fallback):
-            fallback = NEUTRAL_HINT
-        return fallback, discarded
+        safe = tuple(
+            text
+            for text in FALLBACK_HINTS[challenge.type][level]
+            if not hint_reveals_solution(challenge.type, challenge.content, text)
+        )
+        return (pick_variant(safe, previous) if safe else NEUTRAL_HINT), discarded
 
     def _ask(self, prompt: Prompt, max_tokens: int) -> str | None:
         """The model's reply, or None when it failed or said nothing."""

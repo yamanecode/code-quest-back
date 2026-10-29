@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.domain.hints import HINT_MAX_LEVEL, cooldown_left, hint_level
+from app.domain.hints import HINT_MAX_LEVEL, cooldown_left, hint_level, pick_variant
 
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 
@@ -28,3 +28,26 @@ def test_T_DOM_HINT_04_cooldown_rounds_up_to_whole_seconds(elapsed, left):
 
 def test_T_DOM_HINT_04_cooldown_long_over_is_zero():
     assert cooldown_left(NOW - timedelta(hours=2), NOW, 15) == 0
+
+
+def test_T_DOM_HINT_05_pick_variant_takes_the_first_when_nothing_was_shown():
+    assert pick_variant(("a", "b", "c"), []) == "a"
+
+
+def test_T_DOM_HINT_05_pick_variant_skips_variants_already_shown():
+    assert pick_variant(("a", "b", "c"), ["a"]) == "b"
+    assert pick_variant(("a", "b", "c"), ["b", "x"]) == "a"
+    assert pick_variant(("a", "b", "c"), ["a", "b"]) == "c"
+
+
+def test_T_DOM_HINT_06_pick_variant_cycles_through_the_least_recently_shown():
+    shown = ["a", "b", "c"]
+    picks = []
+    for _ in range(6):
+        picks.append(pick_variant(("a", "b", "c"), shown))
+        shown.append(picks[-1])
+    assert picks == ["a", "b", "c", "a", "b", "c"]
+
+
+def test_T_DOM_HINT_06_pick_variant_repeats_the_oldest_even_if_history_is_uneven():
+    assert pick_variant(("a", "b"), ["b", "a", "a", "b", "a"]) == "b"
