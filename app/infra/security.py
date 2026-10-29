@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -5,6 +8,7 @@ import bcrypt
 import jwt
 
 from app.core.config import get_settings
+from app.domain.recovery_code import ALPHABET, CODE_LENGTH, normalize_recovery_code
 
 BCRYPT_ROUNDS = 12
 BCRYPT_MAX_BYTES = 72
@@ -37,6 +41,19 @@ def verify_password(password: str, password_hash: str) -> bool:
     except ValueError:
         # Not a bcrypt hash, e.g. the "!" of the system account.
         return False
+
+
+def generate_recovery_code() -> str:
+    return "".join(secrets.choice(ALPHABET) for _ in range(CODE_LENGTH))
+
+
+def hash_recovery_code(code: str) -> str:
+    # Plain SHA-256 is enough here: the code has 80 random bits, unlike a human-chosen password.
+    return hashlib.sha256(normalize_recovery_code(code).encode()).hexdigest()
+
+
+def recovery_code_matches(code: str, stored_hash: str) -> bool:
+    return hmac.compare_digest(hash_recovery_code(code), stored_hash)
 
 
 def create_token(user_id: int, role: str, now: datetime) -> str:

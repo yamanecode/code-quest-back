@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.services.exceptions import (
+    BadRequest,
     Conflict,
     Forbidden,
     NotFound,
@@ -15,6 +16,7 @@ from app.services.exceptions import (
 )
 
 STATUS_BY_ERROR: dict[type[ServiceError], int] = {
+    BadRequest: 400,
     NotFound: 404,
     Unauthorized: 401,
     Forbidden: 403,

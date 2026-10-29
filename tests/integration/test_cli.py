@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.domain.enums import Role
 from app.infra.db.models import Mission, User
 from app.infra.security import verify_password
+from tests.integration.factories import make_user
 
 PASSWORD = "senha-do-professor"
 BASE_DIR = Path(__file__).resolve().parents[2] / "content" / "base"
@@ -152,3 +153,54 @@ def test_T_CLI_04_password_is_read_from_the_env_file_without_prompting(
 
     user = session.scalar(select(User).filter_by(username="prof_arquivo"))
     assert verify_password(PASSWORD, user.password_hash)
+
+
+def test_T_RECOV_14_cli_resets_the_password_of_a_student_and_a_professor(
+    session, monkeypatch, capsys
+):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+    cli.create_professor(session, "prof_ana")
+    student = make_user(session, "aluna")
+    session.commit()
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", "nova-senha-123")
+    get_settings.cache_clear()
+
+    assert cli.reset_password(session, "prof_ana") == 0
+    assert cli.reset_password(session, "ALUNA") == 0
+
+    professor = session.scalar(select(User).where(User.username == "prof_ana"))
+    session.refresh(student)
+    assert verify_password("nova-senha-123", professor.password_hash)
+    assert verify_password("nova-senha-123", student.password_hash)
+    assert "nova-senha-123" not in capsys.readouterr().out
+
+
+def test_T_RECOV_14_cli_refuses_the_system_account_and_unknown_users(session, monkeypatch, capsys):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+    make_user(session, "codequest", Role.SYSTEM)
+    session.commit()
+
+    assert cli.reset_password(session, "codequest") == 1
+    assert cli.reset_password(session, "ninguem") == 1
+    assert "não encontrado" in capsys.readouterr().err
+
+
+def test_T_RECOV_14_cli_rejects_a_weak_password_and_keeps_the_old_one(session, monkeypatch, capsys):
+    student = make_user(session, "aluna")
+    old_hash = student.password_hash
+    session.commit()
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", "curta")
+
+    assert cli.reset_password(session, "aluna") == 1
+    session.refresh(student)
+    assert student.password_hash == old_hash
+    assert "8 a 72 caracteres" in capsys.readouterr().err
+
+
+def test_T_RECOV_14_main_parses_reset_password(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "reset_password", lambda session, name: calls.append(name) or 0)
+    monkeypatch.setattr(cli, "open_session", lambda: _NullSession())
+
+    assert cli.main(["reset-password", "aluna"]) == 0
+    assert calls == ["aluna"]

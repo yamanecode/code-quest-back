@@ -27,7 +27,12 @@ def test_T_AUTH_01_register_creates_student(client, session):
 
     assert response.status_code == 201
     body = response.json()
-    assert body == {"id": body["id"], "username": "aluna.01", "role": "student"}
+    assert body == {
+        "id": body["id"],
+        "username": "aluna.01",
+        "role": "student",
+        "recovery_code": body["recovery_code"],
+    }
     assert stored_user(session, "aluna.01").role == Role.STUDENT
 
 

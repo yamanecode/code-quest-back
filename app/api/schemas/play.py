@@ -111,6 +111,9 @@ class ProfileOut(BaseModel):
     solved_by_skill: dict[str, int]
     first_try_solves: int
     profile_public: bool
+    recovery_code_active: bool
+    recovery_code_created_at: datetime | None
+    recovery_code_confirmed: bool
     badges: list[ProfileBadgeOut]
 
 

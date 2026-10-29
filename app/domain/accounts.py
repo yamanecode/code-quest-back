@@ -11,6 +11,14 @@ def normalize_username(raw: str) -> str:
     return raw.lower()
 
 
+def password_errors(password: object) -> list[str]:
+    if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+        return [f"A senha deve ter de {PASSWORD_MIN} a {PASSWORD_MAX} caracteres."]
+    if len(password.encode()) > PASSWORD_MAX_BYTES:
+        return ["A senha é longa demais. Use menos acentos."]
+    return []
+
+
 def account_errors(username: object, password: object) -> list[str]:
     """Rules for an already normalized username and a password (RF-01)."""
     errors = []
@@ -18,8 +26,4 @@ def account_errors(username: object, password: object) -> list[str]:
         errors.append(
             "O nome de usuário deve ter de 3 a 30 caracteres: letras minúsculas, números, _ ou ."
         )
-    if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
-        errors.append(f"A senha deve ter de {PASSWORD_MIN} a {PASSWORD_MAX} caracteres.")
-    elif len(password.encode()) > PASSWORD_MAX_BYTES:
-        errors.append("A senha é longa demais. Use menos acentos.")
-    return errors
+    return errors + password_errors(password)

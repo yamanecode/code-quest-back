@@ -75,6 +75,9 @@ def test_T_STU_ME_01_profile_values(client, session, headers):
         "solved_by_skill": {"ordering": 1, "grouping": 1, "filtering": 0, "pattern": 0},
         "first_try_solves": 1,
         "profile_public": False,
+        "recovery_code_active": False,
+        "recovery_code_created_at": None,
+        "recovery_code_confirmed": False,
     }
     assert [badge["code"] for badge in badges] == [badge.code for badge in BADGES]
     by_code = {badge["code"]: badge for badge in badges}

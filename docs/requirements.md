@@ -29,6 +29,8 @@ Each requirement has an ID, the requirement and its acceptance criterion. Functi
 | RF-21 | Base game available to every student | After loading the base content, a newly registered student sees the base missions with challenges of the four types; loading again creates nothing new. |
 | RF-22 | Editing a challenge after students answered it | Text changes are accepted at any time; changing the type, items or solution of a challenge that already has answers returns 409; duplicating creates a draft copy that can be changed freely. |
 
+| RF-23 | Account recovery with a recovery code, without e-mail | Sign-up returns a 16-character recovery code once; `reset-password` with the username, that code (any case, with or without hyphens) and a valid new password changes the password (the old one stops working, the new one logs in) and returns a replacement code, after which the used code answers 400 `invalid_recovery`; a wrong code, an unknown username and a professor username all answer the same 400; a new code can be generated with the current password (wrong password returns 403) and replaces the old one; confirming the code is idempotent. |
+
 ## Safeguards
 
 | ID | Requirement | Acceptance |
@@ -42,6 +44,7 @@ Each requirement has an ID, the requirement and its acceptance criterion. Functi
 | SG-07 | XP only from solved challenges | Logging in, time passing, the streak, the daily challenge, the class goal, badges and hints never create XP. |
 | SG-08 | The student API never returns the solution | No student response contains a `solution` key at any depth, for every type; the explanation appears only once the student solved the challenge; item ids are shown by position and the order differs per student, so the answer cannot be read from the ids or the order. |
 | SG-09 | Only username and password are collected; password stored as a hash | Sign-up accepts only username and password; no response contains the password or its hash. |
+| SG-15 | Recovery code is shown once and protected | No response other than sign-up, password reset and "generate new code" contains a recovery code; `/api/me` only reports whether one is active, since when and whether it was confirmed; the reset endpoint answers identically for an unknown username and a wrong code. |
 | SG-10 | Rankings by period | The weekly rankings count XP from Monday 00:00 (São Paulo) and the monthly rankings from day 1; XP earned now appears in both. |
 | SG-11 | Game elements are not shown in isolation | MANUAL: inspect the student screens; badges always appear next to XP, level and title. |
 | SG-12 | Base challenges need no programming knowledge | MANUAL: inspect the base game statements against the Bebras criteria cited in the text. |

@@ -2,7 +2,8 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import AI, Classrooms, CurrentStudent, Gamification, Play, require_student
+from app.api.deps import AI, Auth, Classrooms, CurrentStudent, Gamification, Play, require_student
+from app.api.schemas.auth import IssuedRecoveryCodeOut, PasswordIn
 from app.api.schemas.classrooms import ClassroomRefOut, JoinRequest, MyClassroomOut
 from app.api.schemas.gamification import RankingOut, RankingPeriodIn, RankingScopeIn
 from app.api.schemas.play import (
@@ -51,6 +52,20 @@ def update_settings(
 ) -> SettingsOut:
     profile_public = gamification.set_profile_public(student.id, body.profile_public)
     return SettingsOut(profile_public=profile_public)
+
+
+@router.post("/me/recovery-code")
+def new_recovery_code(
+    body: PasswordIn, student: CurrentStudent, auth: Auth
+) -> IssuedRecoveryCodeOut:
+    issued = auth.regenerate_recovery_code(student.id, body.password)
+    return IssuedRecoveryCodeOut(**asdict(issued))
+
+
+@router.post("/me/recovery-code/confirm", status_code=204)
+def confirm_recovery_code(student: CurrentStudent, auth: Auth) -> Response:
+    auth.confirm_recovery_code(student.id)
+    return Response(status_code=204)
 
 
 @router.get("/missions")

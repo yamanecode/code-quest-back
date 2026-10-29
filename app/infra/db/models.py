@@ -51,6 +51,11 @@ class User(_Row):
     password_hash: Mapped[str] = mapped_column(String(100))
     role: Mapped[Role] = mapped_column(_enum(Role, "user_role"))
     profile_public: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    recovery_code_hash: Mapped[str | None] = mapped_column(String(64))
+    recovery_code_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recovery_code_confirmed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
 
 
 class Classroom(_Row):

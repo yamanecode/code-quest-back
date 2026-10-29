@@ -47,7 +47,7 @@ Settings are read from environment variables or from `.env` (never committed; se
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | | Endpoint, model and key for `openai_compatible` |
 | `LLM_REASONING_EFFORT` | | Optional `reasoning_effort` sent to reasoning models (e.g. `low`), so hidden reasoning does not use up the reply |
 | `FAKE_LLM_LOG` | | When set, the fake provider appends every prompt it receives to this file |
-| `CODEQUEST_PROFESSOR_PASSWORD` | | Password used by `create-professor` and `seed-demo`; prompted when empty |
+| `CODEQUEST_PROFESSOR_PASSWORD` | | Password used by `create-professor`, `reset-password` and `seed-demo`; prompted when empty |
 
 When the language model fails or times out, hints fall back to fixed texts, so the application keeps working without a provider.
 
@@ -56,6 +56,7 @@ When the language model fails or times out, hints fall back to fixed texts, so t
 | Command | What it does |
 |---|---|
 | `uv run python -m app.cli create-professor <username>` | Creates a professor account. There is no public professor sign-up. |
+| `uv run python -m app.cli reset-password <username>` | Sets a new password for a professor or a student (for example one who lost both the password and the recovery code). |
 | `uv run python -m app.cli load-base content/base` | Loads the base game: the badges, the internal `codequest` account (which cannot log in) and every `content/base/*.json` file as a published mission visible to every student. All files are validated first; any rule violation aborts the load, naming the file and the challenge, and nothing is stored. Missions whose title already exists are skipped, so the command can be run again after adding a file. |
 | `uv run python -m app.cli seed-demo` | Creates demonstration data: the badges, professor `prof_demo`, turma "Turma Demo" (join code `DEMO01`) and the published mission "Missão de exemplo" with one challenge of each type. Running it again creates only what is missing. |
 | `uv run alembic upgrade head` | Applies the database migrations. |

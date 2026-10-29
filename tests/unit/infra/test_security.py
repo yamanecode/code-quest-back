@@ -5,11 +5,15 @@ import pytest
 
 from app.core.clock import TIMEZONE
 from app.core.config import get_settings
+from app.domain.recovery_code import format_recovery_code, is_well_formed
 from app.infra.security import (
     InvalidToken,
     create_token,
     decode_token,
+    generate_recovery_code,
     hash_password,
+    hash_recovery_code,
+    recovery_code_matches,
     verify_password,
 )
 
@@ -65,3 +69,29 @@ def test_T_SEC_05_token_expires_after_8_hours():
 def test_T_SEC_06_tampered_or_incomplete_token_is_rejected(token):
     with pytest.raises(InvalidToken):
         decode_token(token, NOW)
+
+
+def test_T_SEC_RECOV_01_generated_code_is_well_formed_and_random():
+    codes = {generate_recovery_code() for _ in range(20)}
+
+    assert len(codes) == 20
+    assert all(is_well_formed(code) for code in codes)
+
+
+def test_T_SEC_RECOV_02_hash_is_sha256_hex_and_ignores_formatting():
+    code = generate_recovery_code()
+
+    hashed = hash_recovery_code(code)
+
+    assert len(hashed) == 64
+    assert hashed != code
+    assert hashed == hash_recovery_code(format_recovery_code(code).lower())
+
+
+def test_T_SEC_RECOV_03_match_accepts_any_formatting_and_rejects_other_codes():
+    code = generate_recovery_code()
+    stored = hash_recovery_code(code)
+
+    assert recovery_code_matches(format_recovery_code(code).lower(), stored)
+    assert not recovery_code_matches(generate_recovery_code(), stored)
+    assert not recovery_code_matches("", stored)

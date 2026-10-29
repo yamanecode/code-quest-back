@@ -10,6 +10,11 @@ class ServiceError(Exception):
         super().__init__(self.code)
 
 
+class BadRequest(ServiceError):
+    default_code = "bad_request"
+    default_message = "Requisição inválida."
+
+
 class NotFound(ServiceError):
     default_code = "not_found"
     default_message = "Recurso não encontrado."

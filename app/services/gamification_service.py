@@ -76,6 +76,9 @@ class Profile:
     solved_by_skill: dict[str, int]
     first_try_solves: int
     profile_public: bool
+    recovery_code_active: bool
+    recovery_code_created_at: datetime | None
+    recovery_code_confirmed: bool
     badges: list[ProfileBadge]
 
 
@@ -191,6 +194,9 @@ class GamificationService:
             solved_by_skill={t: stats.solved_by_type.get(t, 0) for t in ChallengeType},
             first_try_solves=stats.first_try_solves,
             profile_public=user.profile_public,
+            recovery_code_active=user.recovery_code_hash is not None,
+            recovery_code_created_at=user.recovery_code_created_at,
+            recovery_code_confirmed=user.recovery_code_confirmed,
             badges=[self._profile_badge(badge, earned.get(badge.code)) for badge in BADGES],
         )
 

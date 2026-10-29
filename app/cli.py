@@ -24,7 +24,7 @@ def _read_password() -> str | None:
     password = get_settings().CODEQUEST_PROFESSOR_PASSWORD
     if password:
         return password
-    password = getpass("Senha do professor: ")
+    password = getpass("Senha: ")
     if getpass("Repita a senha: ") != password:
         return None
     return password
@@ -46,6 +46,20 @@ def create_professor(session: Session, username: str) -> int:
         _print_error(error)
         return 1
     print(f"Professor '{account.username}' criado.")
+    return 0
+
+
+def reset_password(session: Session, username: str) -> int:
+    password = _read_password()
+    if password is None:
+        print("As senhas não conferem.", file=sys.stderr)
+        return 1
+    try:
+        AuthService(session, SystemClock()).reset_password_as_admin(username, password)
+    except ServiceError as error:
+        _print_error(error)
+        return 1
+    print(f"Senha de '{username.lower()}' alterada.")
     return 0
 
 
@@ -80,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     professor = commands.add_parser("create-professor", help="cria uma conta de professor")
     professor.add_argument("username")
+    reset = commands.add_parser("reset-password", help="define uma nova senha para uma conta")
+    reset.add_argument("username")
     commands.add_parser("seed-demo", help="cria os dados de demonstração")
     base = commands.add_parser("load-base", help="carrega o jogo base a partir de uma pasta")
     base.add_argument("directory")
@@ -88,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
     with open_session() as session:
         if args.command == "create-professor":
             return create_professor(session, args.username)
+        if args.command == "reset-password":
+            return reset_password(session, args.username)
         if args.command == "seed-demo":
             return seed_demo(session)
         return load_base(session, args.directory)
