@@ -1,10 +1,7 @@
-from datetime import date
-
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.enums import Role
-from app.infra.repositories.daily import DailyRepository
 from app.infra.repositories.users import UserRepository
 from app.infra.repositories.xp import XPRepository
 from tests.integration.factories import (
@@ -33,19 +30,13 @@ def _second_first_solve(session):
     XPRepository(session).add(ana.id, challenge.id, 5, created_at=NOON)
 
 
-def _second_daily(session):
-    ana = make_user(session)
-    DailyRepository(session).add(ana.id, date(2026, 10, 14), make_challenge(session).id, NOON)
-    DailyRepository(session).add(ana.id, date(2026, 10, 14), make_challenge(session).id, NOON)
-
-
 def _goal_out_of_range(session):
     make_classroom(session, weekly_goal=1001)
 
 
 @pytest.mark.parametrize(
     "violation",
-    [_same_username, _same_membership, _second_first_solve, _second_daily, _goal_out_of_range],
+    [_same_username, _same_membership, _second_first_solve, _goal_out_of_range],
 )
 def test_T_REPO_22_database_rejects_duplicates_and_bad_goals(session, violation):
     with pytest.raises(IntegrityError):

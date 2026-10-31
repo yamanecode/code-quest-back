@@ -88,8 +88,8 @@ The code follows a layered architecture; each layer only depends on the layers b
 app/
   api/        presentation: routers, request/response schemas, auth dependencies, error mapping
   services/   application: one method per use case, owns the transaction, builds the prompts
-  domain/     domain: pure Python rules (templates, grading, XP, levels, streak, badges,
-              rankings, daily challenge, class goal, hint leak check)
+  domain/     domain: pure Python rules (templates, grading, XP, levels, badges,
+              rankings, class goal, Continuar card, "Novo" label, hint leak check)
   infra/      infrastructure: ORM models, repositories, language-model adapters, security
   core/       configuration, clock (America/Sao_Paulo) and the LLMClient port
   cli.py      administration commands
@@ -100,7 +100,7 @@ app/
 - Services raise their own exceptions (`app/services/exceptions.py`), which `app/api/errors.py` turns into `{"detail": "<code>", "message": "<texto>"}` responses.
 - The domain imports only the standard library and has 100 % test coverage.
 - Services talk to the language model only through the `LLMClient` protocol (`app/core/ports.py`); the concrete client is chosen by `LLM_PROVIDER`.
-- XP, levels, streaks, rankings and class-goal progress are computed from stored submissions and XP events instead of counters.
+- XP, levels, rankings, class-goal progress, the Continuar challenge and the "Novo" labels are computed from stored submissions and XP events instead of counters.
 
 FastAPI serves the interactive API documentation at `/docs`.
 

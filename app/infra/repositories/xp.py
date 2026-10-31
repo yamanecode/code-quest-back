@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.domain.enums import Role, XPReason
-from app.domain.gamification import FIRST_TRY_XP
+from app.domain.gamification import FIRST_TRY_XP, PERSISTENT_XP
 from app.infra.db.models import Challenge, ClassroomMember, Mission, MissionChallenge, User, XPEvent
 from app.infra.repositories.local_time import day_end, day_start
 
@@ -89,6 +89,13 @@ class XPRepository:
     def first_try_solves(self, user_id: int) -> int:
         query = select(func.count()).where(
             XPEvent.user_id == user_id, XPEvent.amount == FIRST_TRY_XP
+        )
+        return self.session.scalar(query) or 0
+
+    def persistent_solves(self, user_id: int) -> int:
+        """First solves that came after 3 or more wrong answers (they earn the lowest XP)."""
+        query = select(func.count()).where(
+            XPEvent.user_id == user_id, XPEvent.amount == PERSISTENT_XP
         )
         return self.session.scalar(query) or 0
 

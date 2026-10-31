@@ -32,31 +32,44 @@ def test_T_DOM_BADGE_00_catalog_matches_the_spec_table():
         "skill_pattern_3": ("Padrões I", Tier.BRONZE, "🔁", False),
         "skill_pattern_7": ("Padrões II", Tier.SILVER, "🔁", False),
         "skill_pattern_15": ("Padrões III", Tier.GOLD, "🔁", False),
-        "level_3": ("Explorador(a)", Tier.BRONZE, "🧭", False),
-        "level_5": ("Estrategista", Tier.SILVER, "🧭", False),
-        "level_8": ("Arquiteto(a) de soluções", Tier.SILVER, "🧭", False),
-        "level_11": ("Mestre do pensamento", Tier.GOLD, "🧭", False),
+        "level_3": ("Aprendiz", Tier.BRONZE, "🧭", False),
+        "level_6": ("Praticante", Tier.SILVER, "🧭", False),
+        "level_11": ("Mestre", Tier.GOLD, "🧭", False),
         "mission_1": ("Primeira missão", Tier.BRONZE, "🚩", False),
         "mission_5": ("Cinco missões", Tier.SILVER, "🚩", False),
         "mission_10": ("Dez missões", Tier.GOLD, "🚩", False),
-        "streak_3": ("Três dias seguidos", Tier.BRONZE, "🔥", False),
-        "streak_7": ("Sete dias seguidos", Tier.SILVER, "🔥", False),
-        "streak_14": ("Catorze dias seguidos", Tier.GOLD, "🔥", False),
-        "first_try_5": ("Precisão", Tier.SILVER, "🎯", False),
-        "first_try_20": ("Precisão afiada", Tier.GOLD, "🎯", False),
-        "daily_7": ("Compromisso diário", Tier.SILVER, "📅", False),
+        "first_try_5": ("Precisão", Tier.BRONZE, "🎯", False),
+        "first_try_30": ("Precisão afiada", Tier.GOLD, "🎯", False),
         "class_goal_1": ("Trabalho em equipe", Tier.BRONZE, "🤝", False),
         "class_goal_5": ("Equipe afinada", Tier.SILVER, "🤝", False),
-        "all_types_day": ("Pensamento completo", Tier.SILVER, "🌈", True),
-        "no_hint_mission": ("Por conta própria", Tier.SILVER, "🦉", True),
+        "all_types_day": ("Pensamento completo", Tier.GOLD, "🌈", True),
+        "persistent": ("Persistente", Tier.GOLD, "💪", True),
+        "explorer_base": ("Viajante", Tier.GOLD, "🗺️", True),
     }
 
     actual = {badge.code: (badge.name, badge.tier, badge.emoji, badge.hidden) for badge in BADGES}
 
-    assert len(BADGES) == 30
+    assert len(BADGES) == 26
     assert actual == expected
     assert list(actual) == list(expected)
     assert all(badge.description for badge in BADGES)
+
+
+def test_T_DOM_BADGE_00_requires_class_marks_gold_grades_and_class_goals():
+    requires_class = {badge.code for badge in BADGES if badge.requires_class}
+
+    assert requires_class == {
+        "skill_ordering_15",
+        "skill_grouping_15",
+        "skill_filtering_15",
+        "skill_pattern_15",
+        "level_11",
+        "mission_10",
+        "first_try_30",
+        "class_goal_1",
+        "class_goal_5",
+    }
+    assert not any(badge.requires_class for badge in BADGES if badge.hidden)
 
 
 def test_T_DOM_BADGE_00_nothing_is_earned_without_progress():
@@ -67,21 +80,16 @@ def test_T_DOM_BADGE_00_nothing_is_earned_without_progress():
 THRESHOLDS = [
     ("first_solve", "solved_total", 1),
     ("level_3", "level", 3),
-    ("level_5", "level", 5),
-    ("level_8", "level", 8),
+    ("level_6", "level", 6),
     ("level_11", "level", 11),
     ("mission_1", "missions_completed", 1),
     ("mission_5", "missions_completed", 5),
     ("mission_10", "missions_completed", 10),
-    ("streak_3", "streak", 3),
-    ("streak_7", "streak", 7),
-    ("streak_14", "streak", 14),
     ("first_try_5", "first_try_solves", 5),
-    ("first_try_20", "first_try_solves", 20),
-    ("daily_7", "dailies_solved", 7),
+    ("first_try_30", "first_try_solves", 30),
     ("class_goal_1", "goals_contributed", 1),
     ("class_goal_5", "goals_contributed", 5),
-    ("no_hint_mission", "missions_completed_without_hints", 1),
+    ("persistent", "persistent_solves", 1),
 ]
 
 
@@ -117,3 +125,11 @@ def test_T_DOM_BADGE_04_hidden_badge_is_secret_until_earned():
     assert badge_display(hidden, earned=False) == (HIDDEN_BADGE_NAME, "")
     assert badge_display(hidden, earned=True) == (hidden.name, hidden.description)
     assert badge_display(visible, earned=False) == (visible.name, visible.description)
+
+
+def test_T_DOM_BADGE_05_explorer_needs_every_base_mission():
+    check(
+        "explorer_base",
+        BadgeStats(explored_every_base_mission=False),
+        BadgeStats(explored_every_base_mission=True),
+    )

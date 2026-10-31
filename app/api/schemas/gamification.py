@@ -43,7 +43,6 @@ class StudentProgressOut(BaseModel):
     solved_in_class: int
     missions_completed_in_class: int
     hints_used: int
-    streak: int
 
 
 class ClassroomProgressOut(BaseModel):

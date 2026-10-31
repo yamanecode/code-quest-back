@@ -1,10 +1,9 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app.infra.db.models import Submission
-from app.infra.repositories.local_time import day_start, local_date_of
 
 
 class SubmissionRepository:
@@ -37,10 +36,6 @@ class SubmissionRepository:
         solved = self._correct(user_id).where(Submission.challenge_id == challenge_id)
         return bool(self.session.scalar(select(exists(solved))))
 
-    def solved_before(self, user_id: int, day: date) -> set[int]:
-        query = self._correct(user_id).where(Submission.created_at < day_start(day))
-        return set(self.session.scalars(query))
-
     def wrong_attempts(self, user_id: int, challenge_id: int) -> int:
         """Wrong submissions on the challenge; a solved challenge takes no more (all came first)."""
         query = select(func.count()).where(
@@ -50,11 +45,16 @@ class SubmissionRepository:
         )
         return self.session.scalar(query) or 0
 
-    def solve_days(self, user_id: int) -> set[date]:
-        day = local_date_of(Submission.created_at)
-        query = (
-            select(day)
-            .where(Submission.user_id == user_id, Submission.is_correct.is_(True))
-            .distinct()
-        )
+    def answered_challenge_ids(self, user_id: int) -> set[int]:
+        """Challenges with at least one submission, right or wrong."""
+        query = select(Submission.challenge_id).where(Submission.user_id == user_id).distinct()
         return set(self.session.scalars(query))
+
+    def last_answered_challenge_id(self, user_id: int) -> int | None:
+        query = (
+            select(Submission.challenge_id)
+            .where(Submission.user_id == user_id)
+            .order_by(Submission.created_at.desc(), Submission.id.desc())
+            .limit(1)
+        )
+        return self.session.scalar(query)

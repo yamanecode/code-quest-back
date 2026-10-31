@@ -63,11 +63,10 @@ def test_T_PROF_PROGRESS_01_values_per_student_and_completion(client, session, c
             {
                 "username": "ana",
                 "xp_in_class": 35,
-                "level": 2,
+                "level": 3,
                 "solved_in_class": 3,
                 "missions_completed_in_class": 2,
                 "hints_used": 2,
-                "streak": 2,
             },
             {
                 "username": "bia",
@@ -76,7 +75,6 @@ def test_T_PROF_PROGRESS_01_values_per_student_and_completion(client, session, c
                 "solved_in_class": 1,
                 "missions_completed_in_class": 0,
                 "hints_used": 0,
-                "streak": 1,
             },
             {
                 "username": "caio",
@@ -85,7 +83,6 @@ def test_T_PROF_PROGRESS_01_values_per_student_and_completion(client, session, c
                 "solved_in_class": 0,
                 "missions_completed_in_class": 0,
                 "hints_used": 0,
-                "streak": 0,
             },
         ],
     }

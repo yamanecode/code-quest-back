@@ -88,6 +88,8 @@ class Mission(_Row):
     status: Mapped[ContentStatus] = mapped_column(
         _enum(ContentStatus, "content_status"), default=ContentStatus.DRAFT
     )
+    # Set on the first publish only; drives the "Novo" label.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Challenge(_Row):
@@ -103,6 +105,7 @@ class Challenge(_Row):
         _enum(ContentStatus, "content_status"), default=ContentStatus.DRAFT
     )
     origin: Mapped[Origin] = mapped_column(_enum(Origin, "challenge_origin"))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class MissionChallenge(_Row):
@@ -143,15 +146,6 @@ class HintEvent(_Row):
     level: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
     discarded_count: Mapped[int] = mapped_column(Integer, default=0)
-
-
-class DailyAssignment(_Row):
-    __tablename__ = "daily_assignments"
-    __table_args__ = (UniqueConstraint("user_id", "day"),)
-
-    user_id: Mapped[int] = _user_fk()
-    day: Mapped[date] = mapped_column(Date)
-    challenge_id: Mapped[int] = _challenge_fk("CASCADE")
 
 
 class ClassGoalReward(_Row):

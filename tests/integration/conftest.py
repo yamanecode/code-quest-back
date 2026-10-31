@@ -47,7 +47,7 @@ def session(engine: Engine) -> Iterator[Session]:
 
 @pytest.fixture
 def badge_catalog(session: Session) -> None:
-    """The 30 badge rows; the seed and base-game commands create them outside tests."""
+    """The 26 badge rows; the seed and base-game commands create them outside tests."""
     BadgeRepository(session).sync(BADGES)
 
 

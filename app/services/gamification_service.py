@@ -8,6 +8,7 @@ from app.domain.badges import BADGES, Badge, BadgeStats, badge_codes_earned, bad
 from app.domain.challenge_types import ChallengeType
 from app.domain.enums import ContentStatus, Role
 from app.domain.gamification import (
+    TITLE_STEPS,
     RankedRow,
     RankingPeriod,
     RankingScope,
@@ -18,7 +19,7 @@ from app.domain.gamification import (
     level_for,
     mission_completed,
     period_start,
-    streak,
+    solved_in_every_mission,
     title_for,
     window_around,
     xp_to_next_level,
@@ -26,7 +27,6 @@ from app.domain.gamification import (
 from app.infra.db.models import Classroom
 from app.infra.repositories.badges import BadgeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
-from app.infra.repositories.daily import DailyRepository
 from app.infra.repositories.hints import HintRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
@@ -52,8 +52,16 @@ class ProfileBadge:
     tier: str
     emoji: str
     hidden: bool
+    requires_class: bool
     earned: bool
     earned_at: datetime | None
+
+
+@dataclass(frozen=True)
+class TitleStep:
+    title: str
+    min_level: int
+    max_level: int | None
 
 
 @dataclass(frozen=True)
@@ -71,7 +79,7 @@ class Profile:
     level: int
     title: str
     xp_to_next_level: int
-    streak: int
+    title_steps: list[TitleStep]
     missions_completed: int
     solved_by_skill: dict[str, int]
     first_try_solves: int
@@ -122,7 +130,6 @@ class StudentProgress:
     solved_in_class: int
     missions_completed_in_class: int
     hints_used: int
-    streak: int
 
 
 @dataclass(frozen=True)
@@ -146,7 +153,7 @@ def _ranked(rows: list[UserXP]) -> list[RankedRow]:
 
 
 class GamificationService:
-    """A student's progress: XP, level, streak, completed missions and badges."""
+    """A student's progress: XP, level, completed missions and badges."""
 
     def __init__(self, session: Session, clock: Clock) -> None:
         self.session = session
@@ -156,7 +163,6 @@ class GamificationService:
         self.submissions = SubmissionRepository(session)
         self.missions = MissionRepository(session)
         self.hints = HintRepository(session)
-        self.daily = DailyRepository(session)
         self.classrooms = ClassroomRepository(session)
         self.badges = BadgeRepository(session)
 
@@ -189,7 +195,7 @@ class GamificationService:
             level=progress.level,
             title=progress.title,
             xp_to_next_level=xp_to_next_level(progress.xp),
-            streak=stats.streak,
+            title_steps=[TitleStep(*step) for step in TITLE_STEPS],
             missions_completed=stats.missions_completed,
             solved_by_skill={t: stats.solved_by_type.get(t, 0) for t in ChallengeType},
             first_try_solves=stats.first_try_solves,
@@ -273,7 +279,6 @@ class GamificationService:
                     solved_in_class=len(solved & class_challenges),
                     missions_completed_in_class=self._completed_count(missions, solved),
                     hints_used=self.hints.requested_count(member.id, class_challenges),
-                    streak=streak(self.submissions.solve_days(member.id), self.clock.today()),
                 )
             )
         return ClassroomProgress(completion_pct(completed_all, len(students)), students)
@@ -298,33 +303,32 @@ class GamificationService:
             tier=badge.tier,
             emoji=badge.emoji,
             hidden=badge.hidden,
+            requires_class=badge.requires_class,
             earned=earned_at is not None,
             earned_at=earned_at,
         )
 
-    def _completed_missions(self, user_id: int) -> tuple[int, int]:
-        """Completed visible missions, and how many of them had no requested hint."""
+    def _mission_progress(self, user_id: int) -> tuple[int, bool]:
+        """Completed visible missions, and whether every base mission has a solve."""
         solved = self.submissions.solved_challenge_ids(user_id)
-        hinted = self.hints.requested_challenge_ids(user_id)
-        visible = self.missions.visible_mission_ids(user_id)
-        by_mission = self.missions.published_challenge_ids_by_mission(visible)
-        completed = [ids for ids in by_mission.values() if mission_completed(ids, solved)]
-        without_hints = [ids for ids in completed if hinted.isdisjoint(ids)]
-        return len(completed), len(without_hints)
+        visible = self.missions.visible_missions(user_id)
+        by_mission = self.missions.published_challenge_ids_by_mission(m.id for m in visible)
+        completed = sum(mission_completed(ids, solved) for ids in by_mission.values())
+        base = [by_mission[m.id] for m in visible if m.classroom_id is None]
+        return completed, solved_in_every_mission(base, solved)
 
     def _stats(self, user_id: int, level: int) -> BadgeStats:
         today = self.clock.today()
         by_type = self.xp.first_solves_by_type(user_id)
-        completed, completed_without_hints = self._completed_missions(user_id)
+        completed, explored_base = self._mission_progress(user_id)
         return BadgeStats(
             solved_total=sum(by_type.values()),
             solved_by_type=by_type,
             missions_completed=completed,
-            missions_completed_without_hints=completed_without_hints,
-            streak=streak(self.submissions.solve_days(user_id), today),
             level=level,
             first_try_solves=self.xp.first_try_solves(user_id),
-            dailies_solved=self.daily.dailies_solved(user_id),
+            persistent_solves=self.xp.persistent_solves(user_id),
             goals_contributed=self.classrooms.goals_contributed(user_id),
             types_first_solved_today=frozenset(self.xp.first_solve_types_on(user_id, today)),
+            explored_every_base_mission=explored_base,
         )

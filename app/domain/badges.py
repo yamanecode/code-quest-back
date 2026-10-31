@@ -19,6 +19,8 @@ class Badge:
     tier: Tier
     emoji: str
     hidden: bool = False
+    # Locked badges with this flag tell the student they need turma challenges.
+    requires_class: bool = False
 
 
 @dataclass(frozen=True)
@@ -28,13 +30,12 @@ class BadgeStats:
     solved_total: int = 0
     solved_by_type: Mapping[str, int] = field(default_factory=dict)
     missions_completed: int = 0
-    missions_completed_without_hints: int = 0
-    streak: int = 0
     level: int = 1
     first_try_solves: int = 0
-    dailies_solved: int = 0
+    persistent_solves: int = 0
     goals_contributed: int = 0
     types_first_solved_today: frozenset[str] = frozenset()
+    explored_every_base_mission: bool = False
 
 
 HIDDEN_BADGE_NAME = "Insígnia secreta"
@@ -50,23 +51,18 @@ SKILL_BADGES = (
 SKILL_STEPS = (("I", 3, Tier.BRONZE), ("II", 7, Tier.SILVER), ("III", 15, Tier.GOLD))
 
 # Families of badges earned when one number reaches a threshold: (threshold, name, tier).
+# In the graded families only gold is out of reach of the base game (spec 5.1).
 LEVEL_STEPS = (
-    (3, "Explorador(a)", Tier.BRONZE),
-    (5, "Estrategista", Tier.SILVER),
-    (8, "Arquiteto(a) de soluções", Tier.SILVER),
-    (11, "Mestre do pensamento", Tier.GOLD),
+    (3, "Aprendiz", Tier.BRONZE),
+    (6, "Praticante", Tier.SILVER),
+    (11, "Mestre", Tier.GOLD),
 )
 MISSION_STEPS = (
     (1, "Primeira missão", Tier.BRONZE),
     (5, "Cinco missões", Tier.SILVER),
     (10, "Dez missões", Tier.GOLD),
 )
-STREAK_STEPS = (
-    (3, "Três dias seguidos", Tier.BRONZE),
-    (7, "Sete dias seguidos", Tier.SILVER),
-    (14, "Catorze dias seguidos", Tier.GOLD),
-)
-FIRST_TRY_STEPS = ((5, "Precisão", Tier.SILVER), (20, "Precisão afiada", Tier.GOLD))
+FIRST_TRY_STEPS = ((5, "Precisão", Tier.BRONZE), (30, "Precisão afiada", Tier.GOLD))
 CLASS_GOAL_STEPS = ((1, "Trabalho em equipe", Tier.BRONZE), (5, "Equipe afinada", Tier.SILVER))
 
 
@@ -88,6 +84,7 @@ def _skill_rules() -> list[tuple[Badge, Condition]]:
                 f"Resolva {threshold} desafios de {SKILL_LABELS[challenge_type]}.",
                 tier,
                 emoji,
+                requires_class=tier == Tier.GOLD,
             )
             rules.append((badge, _solved_of_type(challenge_type, threshold)))
     return rules
@@ -99,9 +96,20 @@ def _family(
     stat: str,
     steps: tuple[tuple[int, str, Tier], ...],
     describe: Callable[[int], str],
+    always_requires_class: bool = False,
 ) -> list[tuple[Badge, Condition]]:
     return [
-        (Badge(f"{prefix}_{n}", name, describe(n), tier, emoji), _at_least(stat, n))
+        (
+            Badge(
+                f"{prefix}_{n}",
+                name,
+                describe(n),
+                tier,
+                emoji,
+                requires_class=always_requires_class or tier == Tier.GOLD,
+            ),
+            _at_least(stat, n),
+        )
         for n, name, tier in steps
     ]
 
@@ -127,24 +135,11 @@ _RULES: list[tuple[Badge, Condition]] = [
         lambda n: f"Complete {_plural(n, 'missão', 'missões')}.",
     ),
     *_family(
-        "streak", "🔥", "streak", STREAK_STEPS, lambda n: f"Resolva desafios em {n} dias seguidos."
-    ),
-    *_family(
         "first_try",
         "🎯",
         "first_try_solves",
         FIRST_TRY_STEPS,
         lambda n: f"Acerte {n} desafios na primeira tentativa.",
-    ),
-    (
-        Badge(
-            "daily_7",
-            "Compromisso diário",
-            "Resolva 7 desafios diários, cada um no seu próprio dia.",
-            Tier.SILVER,
-            "📅",
-        ),
-        _at_least("dailies_solved", 7),
     ),
     *_family(
         "class_goal",
@@ -152,13 +147,14 @@ _RULES: list[tuple[Badge, Condition]] = [
         "goals_contributed",
         CLASS_GOAL_STEPS,
         lambda n: f"Ajude sua turma a cumprir {_plural(n, 'meta semanal', 'metas semanais')}.",
+        always_requires_class=True,
     ),
     (
         Badge(
             "all_types_day",
             "Pensamento completo",
             "Resolva pela primeira vez desafios dos 4 tipos no mesmo dia.",
-            Tier.SILVER,
+            Tier.GOLD,
             "🌈",
             hidden=True,
         ),
@@ -166,14 +162,25 @@ _RULES: list[tuple[Badge, Condition]] = [
     ),
     (
         Badge(
-            "no_hint_mission",
-            "Por conta própria",
-            "Complete uma missão sem pedir nenhuma dica.",
-            Tier.SILVER,
-            "🦉",
+            "persistent",
+            "Persistente",
+            "Resolva um desafio depois de errar 3 vezes ou mais.",
+            Tier.GOLD,
+            "💪",
             hidden=True,
         ),
-        _at_least("missions_completed_without_hints", 1),
+        _at_least("persistent_solves", 1),
+    ),
+    (
+        Badge(
+            "explorer_base",
+            "Viajante",
+            "Resolva pelo menos um desafio de cada missão do jogo base.",
+            Tier.GOLD,
+            "🗺️",
+            hidden=True,
+        ),
+        lambda stats: stats.explored_every_base_mission,
     ),
 ]
 

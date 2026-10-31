@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from sqlalchemy import exists, func, select
@@ -47,6 +48,10 @@ class ChallengeRepository:
 
     def get(self, challenge_id: int) -> Challenge | None:
         return self.session.get(Challenge, challenge_id)
+
+    def get_many(self, challenge_ids: Iterable[int]) -> dict[int, Challenge]:
+        query = select(Challenge).where(Challenge.id.in_(list(challenge_ids)))
+        return {challenge.id: challenge for challenge in self.session.scalars(query)}
 
     def list_by_owner(self, owner_id: int) -> list[Challenge]:
         query = select(Challenge).where(Challenge.owner_id == owner_id).order_by(Challenge.id)

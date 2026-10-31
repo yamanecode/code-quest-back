@@ -318,6 +318,7 @@ class ContentService:
 
     def _set_mission_status(self, mission: Mission, status: ContentStatus) -> MissionView:
         mission.status = status
+        self._mark_first_publish(mission)
         self.session.commit()
         return self._mission_view(mission)
 
@@ -428,8 +429,14 @@ class ContentService:
 
     def _set_challenge_status(self, challenge: Challenge, status: ContentStatus) -> ChallengeView:
         challenge.status = status
+        self._mark_first_publish(challenge)
         self.session.commit()
         return self._challenge_view(challenge)
+
+    def _mark_first_publish(self, row: Mission | Challenge) -> None:
+        # Republishing keeps the first date, so unpublish + publish does not make it "Novo" again.
+        if row.status == ContentStatus.PUBLISHED and row.published_at is None:
+            row.published_at = self.clock.now()
 
     def _challenge_view(self, challenge: Challenge) -> ChallengeView:
         stats = self.challenges.solve_stats(challenge.id)

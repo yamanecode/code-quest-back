@@ -1,16 +1,12 @@
-from datetime import timedelta
-
 import pytest
 from sqlalchemy import func, select
 
 from app.domain.challenge_types import SKILL_LABELS, ChallengeType
 from app.domain.enums import ContentStatus
-from app.domain.gamification import daily_pick
 from app.infra.db.models import Submission, UserBadge, XPEvent
 from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
-    NOON,
     add_member,
     first_solve,
     link,
@@ -73,6 +69,8 @@ def summary(mission, total, solved):
         "description": None,
         "total": total,
         "solved": solved,
+        "is_new": False,
+        "has_new_challenges": False,
     }
 
 
@@ -148,6 +146,7 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
                 "type": c.type,
                 "skill": SKILL_LABELS[c.type],
                 "solved": c is challenges[1],
+                "is_new": False,
             }
             for c in challenges
         ],
@@ -166,6 +165,7 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
             "options": last.content["options"],
         },
         "solved": False,
+        "is_new": False,
         "explanation": None,
         "cooldown_seconds_left": 0,
     }
@@ -190,7 +190,7 @@ def test_T_STU_CHAL_NOSOL_no_solution_in_any_student_response(
         client.get("/api/missions", headers=headers),
         client.get(f"/api/missions/{mission.id}", headers=headers),
         client.get(f"/api/challenges/{challenge.id}", headers=headers),
-        client.get("/api/daily-challenge", headers=headers),
+        client.get("/api/me/continue", headers=headers),
         client.post(f"/api/challenges/{challenge.id}/hints", headers=headers),
         miss(client, headers, challenge),
     ]
@@ -292,7 +292,7 @@ def test_T_STU_SUBMIT_01_first_try_gives_10(client, session, student, headers, c
     assert (body["xp"], body["level"], body["title"], body["level_up"]) == (
         10,
         1,
-        "Aprendiz",
+        "Iniciante",
         False,
     )
     assert body["hint"] is None
@@ -338,7 +338,7 @@ def test_T_STU_SUBMIT_05_wrong_answer_is_stored_without_xp(
         "xp_earned": 0,
         "xp": 0,
         "level": 1,
-        "title": "Aprendiz",
+        "title": "Iniciante",
         "level_up": False,
         "new_badges": [],
         "explanation": None,
@@ -376,6 +376,8 @@ def test_T_STU_SUBMIT_06_answer_must_be_an_object(client, session, student, head
 
 def test_T_STU_SUBMIT_07_new_badges_are_returned_once(client, session, student, headers):
     mission = make_mission(session)
+    # A second base mission left unsolved, so the explorer badge stays out of this test.
+    make_challenge(session, missions=(make_mission(session),))
     first, second = (make_challenge(session, missions=(mission,)) for _ in range(2))
 
     earned = solve(client, headers, first).json()["new_badges"]
@@ -394,86 +396,19 @@ def test_T_STU_SUBMIT_07_new_badges_are_returned_once(client, session, student, 
     assert rows(session, UserBadge, user_id=student.id) == len(earned) + len(later)
 
 
-def test_T_STU_SUBMIT_08_level_up_when_crossing_100_xp(client, session, student, headers):
-    first_solve(session, student, make_challenge(session), amount=50)
-    first_solve(session, student, make_challenge(session), amount=45)
+def test_T_STU_SUBMIT_08_level_up_when_crossing_60_xp(client, session, student, headers):
+    first_solve(session, student, make_challenge(session), amount=30)
+    first_solve(session, student, make_challenge(session), amount=25)
     mission = make_mission(session)
     crossing, after = (make_challenge(session, missions=(mission,)) for _ in range(2))
 
     body = solve(client, headers, crossing).json()
 
     assert (body["xp"], body["level"], body["title"], body["level_up"]) == (
-        105,
+        65,
         3,
-        "Explorador(a)",
+        "Aprendiz",
         True,
     )
     assert "level_3" in {badge["code"] for badge in body["new_badges"]}
     assert solve(client, headers, after).json()["level_up"] is False
-
-
-# Daily challenge
-
-
-def daily(client, headers):
-    response = client.get("/api/daily-challenge", headers=headers)
-    assert response.status_code == 200
-    return response.json()
-
-
-def test_T_STU_DAILY_01_same_challenge_all_day_even_after_solving(
-    client, session, student, headers, clock
-):
-    mission = make_mission(session)
-    challenges = {c.id: c for c in (make_challenge(session, missions=(mission,)) for _ in range(5))}
-
-    first = daily(client, headers)
-    picked = challenges[first["challenge"]["id"]]
-    assert first == {
-        "challenge": {
-            "id": picked.id,
-            "title": picked.title,
-            "type": "ordering",
-            "skill": "Pensamento algorítmico",
-            "solved": False,
-        },
-        "all_solved": False,
-    }
-
-    solve(client, headers, picked)
-    clock.advance(timedelta(hours=11))
-    headers = bearer(student, clock)  # the 8 h token has expired by now
-
-    again = daily(client, headers)
-    assert again["challenge"]["id"] == picked.id
-    assert again["challenge"]["solved"] is True
-
-
-def test_T_STU_DAILY_02_excludes_challenges_solved_before_today(client, session, student, headers):
-    mission = make_mission(session)
-    yesterday, today = (make_challenge(session, missions=(mission,)) for _ in range(2))
-    first_solve(session, student, yesterday, at=NOON - timedelta(days=1))
-    first_solve(session, student, today, at=NOON - timedelta(hours=1))
-
-    # Solved today still counts: only solves before the day's start are excluded.
-    assert daily(client, headers)["challenge"]["id"] == today.id
-
-
-def test_T_STU_DAILY_03_all_solved_when_nothing_is_left(client, session, student, headers):
-    assert daily(client, headers) == {"challenge": None, "all_solved": True}
-
-    challenge = make_challenge(session, missions=(make_mission(session),))
-    first_solve(session, student, challenge, at=NOON - timedelta(days=2))
-
-    assert daily(client, headers) == {"challenge": None, "all_solved": True}
-
-
-def test_T_STU_DAILY_04_different_students_may_get_different_challenges(client, session, clock):
-    mission = make_mission(session)
-    ids = [make_challenge(session, missions=(mission,)).id for _ in range(10)]
-    students = [make_user(session) for _ in range(10)]
-
-    picks = {s.id: daily(client, bearer(s, clock))["challenge"]["id"] for s in students}
-
-    assert len(set(picks.values())) > 1
-    assert picks == {s.id: daily_pick(s.id, clock.today(), ids) for s in students}

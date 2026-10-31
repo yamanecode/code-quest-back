@@ -1,18 +1,21 @@
 import hashlib
 import hmac
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
 from app.core.config import get_settings
 from app.domain.challenge_types import SKILL_LABELS, to_student_view
-from app.domain.gamification import daily_pick, level_for, title_for, xp_for_wrong_attempts
+from app.domain.enums import Origin
+from app.domain.gamification import level_for, title_for, xp_for_wrong_attempts
 from app.domain.grading import InvalidAnswer, answer_from_student, grade
+from app.domain.novelty import MissionCandidate, is_new, next_challenge
 from app.infra.db.models import Challenge, Mission
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
-from app.infra.repositories.daily import DailyRepository
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
@@ -29,6 +32,8 @@ class MissionSummary:
     description: str | None
     total: int
     solved: int
+    is_new: bool
+    has_new_challenges: bool
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,7 @@ class ChallengeSummary:
     type: str
     skill: str
     solved: bool
+    is_new: bool
 
 
 @dataclass(frozen=True)
@@ -72,6 +78,7 @@ class StudentChallenge:
     skill: str
     content: dict
     solved: bool
+    is_new: bool
     explanation: str | None
     cooldown_seconds_left: int
 
@@ -90,9 +97,14 @@ class SubmissionResult:
 
 
 @dataclass(frozen=True)
-class DailyChallenge:
-    challenge: ChallengeSummary | None
-    all_solved: bool
+class NextChallenge:
+    """What the Continuar card opens."""
+
+    mission_id: int
+    mission_title: str
+    challenge_id: int
+    challenge_title: str
+    is_new: bool
 
 
 def view_seed(challenge_id: int, user_id: int) -> str:
@@ -106,18 +118,49 @@ def _already_solved() -> Conflict:
     return Conflict("already_solved", "Você já resolveu este desafio.")
 
 
-def _summary(challenge: Challenge, solved_ids: set[int]) -> ChallengeSummary:
+def _challenge_is_new(challenge: Challenge, answered: set[int], now: datetime) -> bool:
+    return is_new(
+        challenge.published_at,
+        now,
+        is_base=challenge.origin == Origin.BASE,
+        answered=challenge.id in answered,
+    )
+
+
+def _mission_is_new(mission: Mission, started: bool, now: datetime) -> bool:
+    return is_new(mission.published_at, now, is_base=mission.classroom_id is None, answered=started)
+
+
+def _candidates(
+    missions: Iterable[Mission], by_mission: dict[int, list[int]]
+) -> list[MissionCandidate]:
+    return [
+        MissionCandidate(
+            id=mission.id,
+            is_base=mission.classroom_id is None,
+            published_at=mission.published_at,
+            position=mission.position,
+            challenge_ids=tuple(by_mission[mission.id]),
+        )
+        for mission in missions
+    ]
+
+
+def _summary(
+    challenge: Challenge, solved_ids: set[int], answered: set[int], now: datetime
+) -> ChallengeSummary:
     return ChallengeSummary(
         challenge.id,
         challenge.title,
         challenge.type,
         SKILL_LABELS[challenge.type],
         challenge.id in solved_ids,
+        _challenge_is_new(challenge, answered, now),
     )
 
 
 class PlayService:
-    """What a student does: browse visible missions, open challenges, answer, daily challenge."""
+    """What a student does: browse visible missions, open challenges, answer, continue."""
 
     def __init__(
         self,
@@ -137,17 +180,28 @@ class PlayService:
         self.classrooms = ClassroomRepository(session)
         self.submissions = SubmissionRepository(session)
         self.xp = XPRepository(session)
-        self.daily = DailyRepository(session)
 
     def list_missions(self, user_id: int) -> MissionList:
         visible = self.missions.visible_missions(user_id)
         by_mission = self.missions.published_challenge_ids_by_mission(m.id for m in visible)
         solved = self.submissions.solved_challenge_ids(user_id)
+        answered = self.submissions.answered_challenge_ids(user_id)
+        challenges = self.challenges.get_many(cid for ids in by_mission.values() for cid in ids)
+        now = self.clock.now()
 
         def summary(mission: Mission) -> MissionSummary:
             ids = by_mission[mission.id]
-            done = len(solved.intersection(ids))
-            return MissionSummary(mission.id, mission.title, mission.description, len(ids), done)
+            started = not answered.isdisjoint(ids)
+            new_inside = any(_challenge_is_new(challenges[i], answered, now) for i in ids)
+            return MissionSummary(
+                id=mission.id,
+                title=mission.title,
+                description=mission.description,
+                total=len(ids),
+                solved=len(solved.intersection(ids)),
+                is_new=_mission_is_new(mission, started, now),
+                has_new_challenges=started and new_inside,
+            )
 
         base = [summary(m) for m in visible if m.classroom_id is None]
         classrooms = [
@@ -165,18 +219,21 @@ class PlayService:
             raise NotFound("mission_not_found", "Missão não encontrada.")
         mission = self.missions.get(mission_id)
         solved = self.submissions.solved_challenge_ids(user_id)
+        answered = self.submissions.answered_challenge_ids(user_id)
         challenges = self.missions.published_challenges(mission_id)
+        now = self.clock.now()
         return MissionDetail(
             mission.id,
             mission.title,
             mission.description,
-            [_summary(challenge, solved) for challenge in challenges],
+            [_summary(challenge, solved, answered, now) for challenge in challenges],
         )
 
     def get_challenge(self, user_id: int, challenge_id: int) -> StudentChallenge:
         challenge = self._visible_challenge(user_id, challenge_id)
         view = to_student_view(challenge.type, challenge.content, view_seed(challenge.id, user_id))
         solved = self.submissions.has_solved(user_id, challenge_id)
+        answered = self.submissions.answered_challenge_ids(user_id)
         return StudentChallenge(
             id=challenge.id,
             title=challenge.title,
@@ -185,6 +242,7 @@ class PlayService:
             skill=view["skill"],
             content=view["content"],
             solved=solved,
+            is_new=_challenge_is_new(challenge, answered, self.clock.now()),
             # Shown again once solved, so a closed challenge can still be reviewed.
             explanation=challenge.explanation if solved else None,
             cooldown_seconds_left=self.ai.cooldown_seconds_left(user_id, challenge_id),
@@ -233,20 +291,28 @@ class PlayService:
             hint=hint,
         )
 
-    def daily_challenge(self, user_id: int) -> DailyChallenge:
-        today = self.clock.today()
-        assignment = self.daily.daily_assignment(user_id, today)
-        if assignment is None:
-            visible = self.missions.visible_published_challenge_ids(user_id)
-            candidates = visible - self.submissions.solved_before(user_id, today)
-            challenge_id = daily_pick(user_id, today, candidates)
-            if challenge_id is None:
-                return DailyChallenge(challenge=None, all_solved=True)
-            assignment = self.daily.add(user_id, today, challenge_id, self.clock.now())
-            self.session.commit()
-        challenge = self.challenges.get(assignment.challenge_id)
-        solved = self.submissions.solved_challenge_ids(user_id)
-        return DailyChallenge(challenge=_summary(challenge, solved), all_solved=False)
+    def continue_for(self, user_id: int) -> NextChallenge | None:
+        """The challenge of the Continuar card; None when every visible challenge is solved."""
+        visible = self.missions.visible_missions(user_id)
+        by_mission = self.missions.published_challenge_ids_by_mission(m.id for m in visible)
+        picked = next_challenge(
+            _candidates(visible, by_mission),
+            solved=self.submissions.solved_challenge_ids(user_id),
+            last_challenge_id=self.submissions.last_answered_challenge_id(user_id),
+        )
+        if picked is None:
+            return None
+        mission_id, challenge_id = picked
+        mission = next(m for m in visible if m.id == mission_id)
+        challenge = self.challenges.get(challenge_id)
+        answered = self.submissions.answered_challenge_ids(user_id)
+        return NextChallenge(
+            mission_id=mission.id,
+            mission_title=mission.title,
+            challenge_id=challenge.id,
+            challenge_title=challenge.title,
+            is_new=_challenge_is_new(challenge, answered, self.clock.now()),
+        )
 
     def _visible_challenge(self, user_id: int, challenge_id: int) -> Challenge:
         # Drafts, challenges of other turmas and missing ids all look the same.

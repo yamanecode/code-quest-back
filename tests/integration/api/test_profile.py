@@ -1,16 +1,15 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
 from app.domain.badges import BADGES
 from app.domain.challenge_types import ChallengeType
-from app.domain.enums import HintSource, Role
+from app.domain.enums import Role
 from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     NOON,
     add_member,
-    hint,
     make_challenge,
     make_classroom,
     make_mission,
@@ -68,9 +67,15 @@ def test_T_STU_ME_01_profile_values(client, session, headers):
         "role": "student",
         "xp": 15,
         "level": 1,
-        "title": "Aprendiz",
-        "xp_to_next_level": 35,
-        "streak": 1,
+        "title": "Iniciante",
+        "xp_to_next_level": 15,
+        "title_steps": [
+            {"title": "Iniciante", "min_level": 1, "max_level": 2},
+            {"title": "Aprendiz", "min_level": 3, "max_level": 4},
+            {"title": "Praticante", "min_level": 5, "max_level": 7},
+            {"title": "Especialista", "min_level": 8, "max_level": 10},
+            {"title": "Mestre", "min_level": 11, "max_level": None},
+        ],
         "missions_completed": 0,
         "solved_by_skill": {"ordering": 1, "grouping": 1, "filtering": 0, "pattern": 0},
         "first_try_solves": 1,
@@ -91,16 +96,19 @@ def test_T_STU_ME_01_profile_values(client, session, headers):
         "tier": "bronze",
         "emoji": "🔢",
         "hidden": False,
+        "requires_class": False,
         "earned": False,
         "earned_at": None,
     }
+    assert by_code["skill_ordering_15"]["requires_class"] is True
     assert by_code["all_types_day"] == {
         "code": "all_types_day",
         "name": "Insígnia secreta",
         "description": "",
-        "tier": "silver",
+        "tier": "gold",
         "emoji": "🌈",
         "hidden": True,
+        "requires_class": False,
         "earned": False,
         "earned_at": None,
     }
@@ -115,65 +123,52 @@ def test_T_STU_ME_02_missions_completed_counts_visible_missions_only(
     first, last = (make_challenge(session, missions=(mission,)) for _ in range(2))
 
     assert "mission_1" not in new_badge_codes(solve(client, headers, first))
-    assert {"mission_1", "no_hint_mission"} <= new_badge_codes(solve(client, headers, last))
+    assert "mission_1" in new_badge_codes(solve(client, headers, last))
     assert me(client, headers)["missions_completed"] == 1
 
     client.delete(f"/api/classrooms/{classroom.id}/membership", headers=headers)
 
     profile = me(client, headers)
     assert profile["missions_completed"] == 0
-    assert {b["code"] for b in profile["badges"] if b["earned"]} >= {"mission_1", "no_hint_mission"}
+    assert "mission_1" in {b["code"] for b in profile["badges"] if b["earned"]}
 
 
-def test_T_STU_ME_03_requested_hint_blocks_no_hint_mission_but_automatic_does_not(
-    client, session, student, headers
-):
-    with_request, with_automatic = make_mission(session), make_mission(session)
-    asked = make_challenge(session, missions=(with_request,))
-    automatic = make_challenge(session, missions=(with_automatic,))
-    hint(session, student, asked, HintSource.REQUEST)
-    hint(session, student, automatic, HintSource.AFTER_WRONG)
+def miss_times(client, headers, challenge, times):
+    for _ in range(times):
+        send(client, headers, challenge, WRONG_ANSWER)
 
-    first = solve(client, headers, asked)
-    second = solve(client, headers, automatic)
 
-    assert "mission_1" in new_badge_codes(first)
-    assert "no_hint_mission" not in new_badge_codes(first)
-    assert "no_hint_mission" in new_badge_codes(second)
+def test_T_STU_BADGE_PERSIST_01_solve_after_three_wrong_answers(client, session, headers):
+    mission = make_mission(session)
+    after_two, after_three = (make_challenge(session, missions=(mission,)) for _ in range(2))
+
+    miss_times(client, headers, after_two, 2)
+    assert "persistent" not in new_badge_codes(solve(client, headers, after_two))
+
+    miss_times(client, headers, after_three, 3)
+    assert "persistent" in new_badge_codes(solve(client, headers, after_three))
+
+
+def test_T_STU_BADGE_EXPLORE_01_one_solve_in_every_base_mission(client, session, student, headers):
+    first, second = make_mission(session), make_mission(session)
+    one = make_challenge(session, missions=(first,))
+    make_challenge(session, missions=(first,))
+    two = make_challenge(session, missions=(second,))
+    classroom = make_classroom(session)
+    add_member(session, student, classroom)
+    make_challenge(session, missions=(make_mission(session, classroom),))  # turma: not needed
+
+    assert "explorer_base" not in new_badge_codes(solve(client, headers, one))
+    assert "explorer_base" in new_badge_codes(solve(client, headers, two))
 
 
 def test_T_STU_ME_04_fresh_profile(client, headers):
     profile = me(client, headers)
 
-    assert (profile["xp"], profile["level"], profile["xp_to_next_level"]) == (0, 1, 50)
-    assert (profile["streak"], profile["missions_completed"], profile["first_try_solves"]) == (
-        0,
-        0,
-        0,
-    )
+    assert (profile["xp"], profile["level"], profile["xp_to_next_level"]) == (0, 1, 30)
+    assert (profile["missions_completed"], profile["first_try_solves"]) == (0, 0)
+    assert "streak" not in profile
     assert not any(badge["earned"] for badge in profile["badges"])
-
-
-def test_T_STU_STREAK_01_streak_follows_solve_days_and_gives_no_xp(client, session, student, clock):
-    headers = bearer(student, clock)
-    mission = make_mission(session)
-    first, second, third = (make_challenge(session, missions=(mission,)) for _ in range(3))
-
-    solve(client, headers, first)
-    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (1, 10)
-
-    clock.advance(timedelta(days=1))
-    headers = bearer(student, clock)  # log in again on the new day
-    assert me(client, headers)["streak"] == 1  # yesterday still counts
-    solve(client, headers, second)
-    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (2, 20)
-
-    clock.advance(timedelta(days=2))
-    headers = bearer(student, clock)  # log in again on the new day
-    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (0, 20)
-
-    solve(client, headers, third)  # the streak restarts; XP still comes only from solves
-    assert (me(client, headers)["streak"], me(client, headers)["xp"]) == (1, 30)
 
 
 def test_T_STU_PUBLIC_01_settings_toggle(client, headers):
@@ -230,23 +225,18 @@ def test_T_STU_PUBLIC_03_public_profile_has_exactly_the_public_fields(
 
     assert body == {
         "username": "aluna",
-        "level": 1,
-        "title": "Aprendiz",
+        "level": 2,
+        "title": "Iniciante",
         "badges": [
             {"code": "first_solve", "name": "Primeiro desafio", "tier": "bronze", "emoji": "⭐"},
             {"code": "mission_1", "name": "Primeira missão", "tier": "bronze", "emoji": "🚩"},
             {
                 "code": "all_types_day",
                 "name": "Pensamento completo",
-                "tier": "silver",
+                "tier": "gold",
                 "emoji": "🌈",
             },
-            {
-                "code": "no_hint_mission",
-                "name": "Por conta própria",
-                "tier": "silver",
-                "emoji": "🦉",
-            },
+            {"code": "explorer_base", "name": "Viajante", "tier": "gold", "emoji": "🗺️"},
         ],
     }
 

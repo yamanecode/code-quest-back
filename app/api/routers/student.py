@@ -8,7 +8,7 @@ from app.api.schemas.classrooms import ClassroomRefOut, JoinRequest, MyClassroom
 from app.api.schemas.gamification import RankingOut, RankingPeriodIn, RankingScopeIn
 from app.api.schemas.play import (
     ChallengeForStudentOut,
-    DailyOut,
+    ContinueOut,
     HintOut,
     MissionDetailOut,
     MissionsOut,
@@ -95,9 +95,12 @@ def request_hint(challenge_id: int, student: CurrentStudent, ai: AI) -> HintOut:
     return HintOut(**asdict(ai.request_hint(student.id, challenge_id)))
 
 
-@router.get("/daily-challenge")
-def daily_challenge(student: CurrentStudent, play: Play) -> DailyOut:
-    return DailyOut(**asdict(play.daily_challenge(student.id)))
+@router.get("/me/continue", response_model=ContinueOut, responses={204: {}})
+def continue_playing(student: CurrentStudent, play: Play) -> ContinueOut | Response:
+    next_up = play.continue_for(student.id)
+    if next_up is None:
+        return Response(status_code=204)
+    return ContinueOut(**asdict(next_up))
 
 
 @router.get("/rankings")

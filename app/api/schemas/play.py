@@ -9,6 +9,8 @@ class MissionSummaryOut(BaseModel):
     description: str | None
     total: int
     solved: int
+    is_new: bool
+    has_new_challenges: bool
 
 
 class ClassroomMissionsOut(BaseModel):
@@ -28,6 +30,7 @@ class ChallengeSummaryOut(BaseModel):
     type: str
     skill: str
     solved: bool
+    is_new: bool
 
 
 class MissionDetailOut(BaseModel):
@@ -47,6 +50,7 @@ class ChallengeForStudentOut(BaseModel):
     skill: str
     content: dict
     solved: bool
+    is_new: bool
     explanation: str | None
     cooldown_seconds_left: int
 
@@ -83,9 +87,12 @@ class SubmissionOut(BaseModel):
     hint: str | None
 
 
-class DailyOut(BaseModel):
-    challenge: ChallengeSummaryOut | None
-    all_solved: bool
+class ContinueOut(BaseModel):
+    mission_id: int
+    mission_title: str
+    challenge_id: int
+    challenge_title: str
+    is_new: bool
 
 
 class ProfileBadgeOut(BaseModel):
@@ -95,8 +102,15 @@ class ProfileBadgeOut(BaseModel):
     tier: str
     emoji: str
     hidden: bool
+    requires_class: bool
     earned: bool
     earned_at: datetime | None
+
+
+class TitleStepOut(BaseModel):
+    title: str
+    min_level: int
+    max_level: int | None
 
 
 class ProfileOut(BaseModel):
@@ -106,7 +120,7 @@ class ProfileOut(BaseModel):
     level: int
     title: str
     xp_to_next_level: int
-    streak: int
+    title_steps: list[TitleStepOut]
     missions_completed: int
     solved_by_skill: dict[str, int]
     first_try_solves: int

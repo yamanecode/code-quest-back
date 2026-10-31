@@ -69,6 +69,7 @@ def make_mission(
     status: ContentStatus = ContentStatus.PUBLISHED,
     title: str | None = None,
     position: int = 0,
+    published_at: datetime | None = None,
 ) -> Mission:
     return _add(
         session,
@@ -77,6 +78,7 @@ def make_mission(
             title=title or f"Missão {next(_sequence)}",
             position=position,
             status=status,
+            published_at=published_at,
         ),
     )
 
@@ -88,6 +90,8 @@ def make_challenge(
     status: ContentStatus = ContentStatus.PUBLISHED,
     missions: tuple[Mission, ...] = (),
     explanation: str | None = None,
+    published_at: datetime | None = None,
+    origin: Origin = Origin.PROFESSOR,
 ) -> Challenge:
     author = owner or make_user(session, role=Role.PROFESSOR)
     challenge = _add(
@@ -100,7 +104,8 @@ def make_challenge(
             content=CONTENT[challenge_type],
             explanation=explanation,
             status=status,
-            origin=Origin.PROFESSOR,
+            origin=origin,
+            published_at=published_at,
         ),
     )
     for mission in missions:

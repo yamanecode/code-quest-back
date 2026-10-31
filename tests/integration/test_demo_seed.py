@@ -38,7 +38,7 @@ def test_T_SEED_01_one_published_challenge_per_type_in_the_demo_turma(session):
     assert {c.status for c in challenges} == {ContentStatus.PUBLISHED}
     assert {c.origin for c in challenges} == {Origin.PROFESSOR}
     assert {c.owner_id for c in challenges} == {professor.id}
-    assert row_counts(session)["badges"] == 30
+    assert row_counts(session)["badges"] == 26
 
 
 def test_T_SEED_01_seeding_twice_changes_nothing_and_asks_no_password(session):

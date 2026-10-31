@@ -53,13 +53,6 @@ class HintRepository:
         count, last_shown_at = self.session.execute(query).one()
         return HintUsage(count=count, last_shown_at=last_shown_at)
 
-    def requested_challenge_ids(self, user_id: int) -> set[int]:
-        """Challenges on which the student asked for a hint (automatic hints don't count)."""
-        query = select(HintEvent.challenge_id).where(
-            HintEvent.user_id == user_id, HintEvent.source == HintSource.REQUEST
-        )
-        return set(self.session.scalars(query))
-
     def requested_count(self, user_id: int, challenge_ids: Iterable[int]) -> int:
         query = select(func.count()).where(
             HintEvent.user_id == user_id,

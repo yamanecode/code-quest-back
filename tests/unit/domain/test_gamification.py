@@ -1,16 +1,15 @@
-import hashlib
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 
 from app.domain.gamification import (
     TIMEZONE,
+    TITLE_STEPS,
     RankedRow,
     RankingPeriod,
     RankRow,
     completed_every_mission,
     completion_pct,
-    daily_pick,
     dense_rank,
     goal_reached,
     goal_target,
@@ -18,19 +17,13 @@ from app.domain.gamification import (
     mission_completed,
     month_start,
     period_start,
-    streak,
+    solved_in_every_mission,
     title_for,
     week_start,
     window_around,
     xp_for_wrong_attempts,
     xp_to_next_level,
 )
-
-TODAY = date(2026, 10, 20)
-
-
-def days_ago(*offsets: int) -> set[date]:
-    return {TODAY - timedelta(days=offset) for offset in offsets}
 
 
 @pytest.mark.parametrize(("wrong", "xp"), [(0, 10), (1, 5), (2, 5), (3, 2), (40, 2)])
@@ -43,43 +36,43 @@ def test_T_DOM_XP_02_negative_attempts_are_rejected():
         xp_for_wrong_attempts(-1)
 
 
-def test_T_DOM_LEVEL_01_level_grows_every_50_xp():
-    assert [level_for(xp) for xp in (0, 49, 50, 99, 100, 280)] == [1, 1, 2, 2, 3, 6]
+def test_T_DOM_LEVEL_01_level_grows_every_30_xp():
+    assert [level_for(xp) for xp in (0, 29, 30, 279, 280, 300)] == [1, 1, 2, 10, 10, 11]
 
 
 def test_T_DOM_LEVEL_02_xp_to_next_level():
-    assert [xp_to_next_level(xp) for xp in (0, 1, 49, 50, 280)] == [50, 49, 1, 50, 20]
+    assert [xp_to_next_level(xp) for xp in (0, 1, 29, 30, 280)] == [30, 29, 1, 30, 20]
 
 
 @pytest.mark.parametrize(
     ("levels", "title"),
     [
-        ((1, 2), "Aprendiz"),
-        ((3, 4), "Explorador(a)"),
-        ((5, 7), "Estrategista"),
-        ((8, 10), "Arquiteto(a) de soluções"),
-        ((11, 40), "Mestre do pensamento"),
+        ((1, 2), "Iniciante"),
+        ((3, 4), "Aprendiz"),
+        ((5, 7), "Praticante"),
+        ((8, 10), "Especialista"),
+        ((11, 40), "Mestre"),
     ],
 )
 def test_T_DOM_TITLE_01_title_by_level_band(levels, title):
     assert {title_for(level) for level in levels} == {title}
 
 
-def test_T_DOM_STREAK_01_streak_ending_today():
-    assert streak(days_ago(0, 1, 2), TODAY) == 3
+@pytest.mark.parametrize(
+    ("xp", "title"), [(0, "Iniciante"), (29, "Iniciante"), (279, "Especialista"), (300, "Mestre")]
+)
+def test_T_DOM_TITLE_02_title_from_xp(xp, title):
+    assert title_for(level_for(xp)) == title
 
 
-def test_T_DOM_STREAK_02_streak_ending_yesterday_still_counts():
-    assert streak(days_ago(1, 2), TODAY) == 2
-
-
-def test_T_DOM_STREAK_03_a_missed_day_resets_the_streak():
-    assert streak(days_ago(0, 2, 3), TODAY) == 1
-    assert streak(days_ago(2, 3, 4), TODAY) == 0
-
-
-def test_T_DOM_STREAK_04_no_solves_means_no_streak():
-    assert streak(set(), TODAY) == 0
+def test_T_DOM_TITLE_STEPS_01_five_ordered_bands_without_gaps():
+    assert TITLE_STEPS == (
+        ("Iniciante", 1, 2),
+        ("Aprendiz", 3, 4),
+        ("Praticante", 5, 7),
+        ("Especialista", 8, 10),
+        ("Mestre", 11, None),
+    )
 
 
 def test_T_DOM_RANK_01_week_starts_monday_midnight_in_sao_paulo():
@@ -134,27 +127,6 @@ def test_T_DOM_RANK_05_window_is_clipped_at_top_and_bottom():
     assert [row.user_id for row in window_around(ranking(10), user_id=10)] == [8, 9, 10]
     assert [row.user_id for row in window_around(ranking(2), user_id=2)] == [1, 2]
     assert window_around(ranking(3), user_id=99) == []
-
-
-def test_T_DOM_DAILY_01_pick_follows_the_sha256_rule_and_is_deterministic():
-    candidates = [30, 10, 20, 40]
-    digest = hashlib.sha256(b"7:2026-10-20").hexdigest()
-    expected = sorted(candidates)[int(digest, 16) % len(candidates)]
-
-    assert daily_pick(7, TODAY, candidates) == expected
-    assert daily_pick(7, TODAY, list(reversed(candidates))) == expected
-
-
-def test_T_DOM_DAILY_02_pick_depends_on_user_and_day():
-    candidates = list(range(1, 21))
-    by_user = {daily_pick(user_id, TODAY, candidates) for user_id in range(1, 11)}
-    by_day = {daily_pick(7, TODAY + timedelta(days=n), candidates) for n in range(10)}
-    assert len(by_user) > 1
-    assert len(by_day) > 1
-
-
-def test_T_DOM_DAILY_03_no_candidates_gives_none():
-    assert daily_pick(7, TODAY, []) is None
 
 
 def test_T_DOM_GOAL_01_automatic_target_is_max_of_10_and_5_per_member():
@@ -220,3 +192,12 @@ def test_T_DOM_MISSION_03_completed_every_mission():
 
 def test_T_DOM_MISSION_04_no_missions_means_nothing_to_complete():
     assert not completed_every_mission([], solved_ids={1})
+
+
+def test_T_DOM_EXPLORE_01_solved_in_every_mission_needs_one_solve_per_mission():
+    missions = [[1, 2], [3], [4, 5]]
+    assert solved_in_every_mission(missions, {2, 3, 4})
+    assert not solved_in_every_mission(missions, {1, 2, 3})
+    assert not solved_in_every_mission([], {1})
+    # A mission without published challenges cannot be explored, so it does not count.
+    assert solved_in_every_mission([[1], []], {1})
