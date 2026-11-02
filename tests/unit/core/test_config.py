@@ -18,6 +18,12 @@ def test_T_CONFIG_04_login_limit_defaults():
     assert settings.LOGIN_WINDOW_SECONDS == 900
 
 
+def test_T_CONFIG_06_no_daily_model_limit_by_default():
+    settings = Settings(_env_file=None, DATABASE_URL="postgresql+psycopg://x", JWT_SECRET="s")
+
+    assert settings.LLM_DAILY_LIMIT == 0
+
+
 def test_T_CONFIG_03_professor_password_is_optional_and_read_from_the_env_file(
     monkeypatch, tmp_path
 ):

@@ -1,0 +1,11 @@
+# Allowlist: the image gets only what the server needs, so .env, .venv, .git, tests,
+# docs/evidence and any local file stay out.
+*
+!app
+!alembic
+!alembic.ini
+!content
+!pyproject.toml
+!uv.lock
+!.python-version
+**/__pycache__

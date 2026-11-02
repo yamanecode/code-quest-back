@@ -12,7 +12,7 @@ from app.core.clock import Clock, SystemClock
 from app.core.config import get_settings
 from app.core.ports import LLMClient
 from app.domain.enums import Role
-from app.infra.db.session import get_session
+from app.infra.db.session import get_session, get_sessionmaker
 from app.infra.llm.factory import build_llm_client
 from app.services.ai_service import AIService
 from app.services.auth_service import Account, AuthService
@@ -34,7 +34,7 @@ def get_clock() -> Clock:
 @lru_cache
 def get_llm_client() -> LLMClient:
     """One client per process: the HTTP adapter keeps its connection pool."""
-    return build_llm_client(get_settings())
+    return build_llm_client(get_settings(), get_sessionmaker(), SystemClock())
 
 
 @lru_cache

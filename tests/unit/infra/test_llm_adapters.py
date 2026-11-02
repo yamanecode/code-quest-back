@@ -1,13 +1,18 @@
 import json
+from datetime import datetime
 
 import httpx
 import pytest
+from sqlalchemy.orm import sessionmaker
 
+from app.core.clock import TIMEZONE
 from app.core.config import Settings
 from app.core.ports import LLMError
+from app.infra.llm.daily_limit import DailyLimitedLLMClient
 from app.infra.llm.factory import build_llm_client
 from app.infra.llm.fake import FakeLLMClient
 from app.infra.llm.openai_compatible import TIMEOUT_SECONDS, OpenAICompatibleClient
+from tests.fixed_clock import FixedClock
 
 
 def client_answering(handler) -> OpenAICompatibleClient:
@@ -123,6 +128,21 @@ def test_T_AI_FACTORY_01_provider_is_chosen_by_settings(tmp_path):
     assert build_llm_client(settings(FAKE_LLM_LOG="")).log_path is None
     with pytest.raises(ValueError, match="LLM_PROVIDER"):
         build_llm_client(settings(LLM_PROVIDER="outro"))
+
+
+def test_T_AI_LIMIT_09_only_a_positive_daily_limit_wraps_the_client():
+    sessions = sessionmaker()
+    clock = FixedClock(datetime(2026, 10, 14, 12, 0, tzinfo=TIMEZONE))
+
+    plain = build_llm_client(settings(LLM_DAILY_LIMIT=0), sessions, clock)
+    limited = build_llm_client(settings(LLM_DAILY_LIMIT=3), sessions, clock)
+
+    assert isinstance(plain, FakeLLMClient)
+    assert isinstance(limited, DailyLimitedLLMClient)
+    assert limited.limit == 3
+    assert isinstance(limited.inner, FakeLLMClient)
+    with pytest.raises(ValueError, match="LLM_DAILY_LIMIT"):
+        build_llm_client(settings(LLM_DAILY_LIMIT=3))
 
 
 def test_T_AI_FAKE_00_scripted_replies_in_order_and_prompts_recorded():

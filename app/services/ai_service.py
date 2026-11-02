@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
-from app.core.ports import LLMClient, LLMError
+from app.core.ports import LLMClient, LLMError, LLMLimitReached
 from app.domain.challenge_types import (
     ChallengeDraft,
     ChallengeType,
@@ -193,6 +193,12 @@ def _parse_draft(challenge_type: str, reply: str) -> tuple[ChallengeDraft | None
     return draft, challenge_errors(draft) or draft_rule_errors(draft)
 
 
+def _log_failure(error: LLMError) -> None:
+    # The daily limit is logged once per day by the client that enforces it.
+    if not isinstance(error, LLMLimitReached):
+        logger.warning("LLM call failed: %s", error)
+
+
 class AIService:
     """Hints for students and review/draft support for professors."""
 
@@ -306,7 +312,7 @@ class AIService:
                 prompt.system, prompt.user, max_tokens=max_tokens, timeout_seconds=timeout_seconds
             )
         except LLMError as error:
-            logger.warning("LLM call failed: %s", error)
+            _log_failure(error)
             return None
         if not reply.strip():
             logger.warning("LLM returned an empty reply")
@@ -344,7 +350,7 @@ class AIService:
                     timeout_seconds=DRAFT_TIMEOUT_SECONDS,
                 )
             except LLMError as error:
-                logger.warning("LLM call failed: %s", error)
+                _log_failure(error)
                 raise ServiceUnavailable(
                     "ai_unavailable", "A IA não está disponível agora. Tente de novo mais tarde."
                 ) from error

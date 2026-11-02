@@ -49,10 +49,25 @@ Settings are read from environment variables or from `.env` (never committed; se
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | | Endpoint, model and key for `openai_compatible` |
 | `LLM_REASONING_EFFORT` | | Optional `reasoning_effort` sent to reasoning models (e.g. `low`), so hidden reasoning does not use up the reply |
 | `FAKE_LLM_LOG` | | When set, the fake provider appends every prompt it receives to this file |
+| `LLM_DAILY_LIMIT` | `0` | Model calls allowed per day (America/Sao_Paulo), failed calls included; `0` means no limit. Once reached, hints use the fixed texts, the review lists only the rule violations and drafts answer 503 until midnight |
 | `CODEQUEST_PROFESSOR_PASSWORD` | | Password used by `create-professor`, `reset-password` and `seed-demo`; prompted when empty |
 | `CODEQUEST_DEMO_PASSWORD` | | Password of the demo students of `seed-demo --students`; prompted when empty in a terminal, an error without one |
 
 When the language model fails or times out, hints fall back to fixed texts, so the application keeps working without a provider.
+
+## Online demo
+
+The `Dockerfile` builds the production image: it installs the locked dependencies (without the development group), runs as a non-root user and, on start, applies the migrations and serves the API on `$PORT` (default `8000`).
+
+```
+docker build -t codequest-back .
+docker run -p 8000:8000 -e DATABASE_URL=... -e JWT_SECRET=... -e FRONTEND_ORIGIN=... codequest-back
+```
+
+Load the base game once from a shell in the container (`python -m app.cli load-base content/base`) and create the professor accounts the same way.
+
+- **Client address behind a proxy.** The server reads `X-Forwarded-For` only when the request comes from an address listed in `FORWARDED_ALLOW_IPS` (uvicorn's setting, default `127.0.0.1`). The login limit counts failures per username and client address, so set `FORWARDED_ALLOW_IPS` on the host to the address range of its proxy. Use `*` only on a host where the container can be reached exclusively through that proxy (check the host's documentation first): with `*`, anyone who reaches the container directly can choose the address the login limit sees.
+- **Spending.** Set `LLM_DAILY_LIMIT`, a spending cap in the AI provider's dashboard, or both, before sharing the address.
 
 ## Commands
 

@@ -179,3 +179,12 @@ class UserBadge(_Row):
 
     user_id: Mapped[int] = _user_fk()
     badge_id: Mapped[int] = mapped_column(ForeignKey("badges.id"))
+
+
+class LLMUsage(_Row):
+    """Model calls made on one local day (America/Sao_Paulo), for LLM_DAILY_LIMIT."""
+
+    __tablename__ = "llm_usage"
+
+    day: Mapped[date] = mapped_column(Date, unique=True)
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

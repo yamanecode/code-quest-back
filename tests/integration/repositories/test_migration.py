@@ -23,6 +23,7 @@ SPEC_TABLES = {
     "class_goal_rewards",
     "badges",
     "user_badges",
+    "llm_usage",
 }
 
 
@@ -67,6 +68,15 @@ def test_T_MIG_06_missions_and_challenges_have_a_unique_optional_base_key(engine
         assert columns["base_key"]["nullable"]
         unique = inspect(engine).get_unique_constraints(table)
         assert any(constraint["column_names"] == ["base_key"] for constraint in unique)
+
+
+def test_T_MIG_07_llm_usage_counts_model_calls_per_day(engine: Engine):
+    columns = {column["name"]: column for column in inspect(engine).get_columns("llm_usage")}
+
+    assert not columns["day"]["nullable"]
+    assert not columns["count"]["nullable"]
+    unique = inspect(engine).get_unique_constraints("llm_usage")
+    assert any(constraint["column_names"] == ["day"] for constraint in unique)
 
 
 def _alembic() -> Config:

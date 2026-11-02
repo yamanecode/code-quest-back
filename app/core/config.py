@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_REASONING_EFFORT: str = ""
     FAKE_LLM_LOG: str | None = None
+    # Model calls allowed per local day, failed ones included; 0 = no limit.
+    LLM_DAILY_LIMIT: int = 0
     # Used only by the professor commands of app.cli; prompted when empty.
     CODEQUEST_PROFESSOR_PASSWORD: str | None = None
     # Used only by `app.cli seed-demo --students`; prompted when empty and in a terminal.
