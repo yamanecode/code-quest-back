@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import SystemClock
 from app.core.config import get_settings
 from app.infra.db.session import get_sessionmaker
+from app.infra.llm.factory import build_llm_client
 from app.services.auth_service import AuthService
 from app.services.base_content_service import BaseContentService
 from app.services.demo_service import DemoService
@@ -20,14 +21,29 @@ def open_session() -> Session:
     return get_sessionmaker()()
 
 
-def _read_password() -> str | None:
-    password = get_settings().CODEQUEST_PROFESSOR_PASSWORD
-    if password:
-        return password
+def _prompt_password() -> str | None:
     password = getpass("Senha: ")
     if getpass("Repita a senha: ") != password:
         return None
     return password
+
+
+def _read_password() -> str | None:
+    return get_settings().CODEQUEST_PROFESSOR_PASSWORD or _prompt_password()
+
+
+def _read_demo_password() -> str | None:
+    password = get_settings().CODEQUEST_DEMO_PASSWORD
+    if password:
+        return password
+    # Without a terminal (a script, a container) a prompt would wait forever.
+    if not sys.stdin.isatty():
+        raise ValidationFailed(
+            "demo_password_missing",
+            "Defina CODEQUEST_DEMO_PASSWORD ou rode o comando em um terminal.",
+        )
+    print("Senha dos estudantes de demonstração.")
+    return _prompt_password()
 
 
 def _print_error(error: ServiceError) -> None:
@@ -63,9 +79,11 @@ def reset_password(session: Session, username: str) -> int:
     return 0
 
 
-def seed_demo(session: Session) -> int:
+def seed_demo(session: Session, students: bool = False) -> int:
+    # The model is never called: the seeded wrong answers skip the hint step.
+    service = DemoService(session, SystemClock(), build_llm_client(get_settings()))
     try:
-        created = DemoService(session).seed(_read_password)
+        created = service.seed(_read_password, _read_demo_password if students else None)
     except ServiceError as error:
         _print_error(error)
         return 1
@@ -103,7 +121,12 @@ def main(argv: list[str] | None = None) -> int:
     professor.add_argument("username")
     reset = commands.add_parser("reset-password", help="define uma nova senha para uma conta")
     reset.add_argument("username")
-    commands.add_parser("seed-demo", help="cria os dados de demonstração")
+    demo = commands.add_parser("seed-demo", help="cria os dados de demonstração")
+    demo.add_argument(
+        "--students",
+        action="store_true",
+        help="cria também seis estudantes com progresso nesta semana (precisa do jogo base)",
+    )
     base = commands.add_parser("load-base", help="carrega o jogo base a partir de uma pasta")
     base.add_argument("directory")
     args = parser.parse_args(argv)
@@ -114,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "reset-password":
             return reset_password(session, args.username)
         if args.command == "seed-demo":
-            return seed_demo(session)
+            return seed_demo(session, students=args.students)
         return load_base(session, args.directory)
 
 

@@ -30,3 +30,13 @@ def test_T_CONFIG_03_professor_password_is_optional_and_read_from_the_env_file(
     assert Settings(_env_file=env_file, **required).CODEQUEST_PROFESSOR_PASSWORD == (
         "senha-do-arquivo"
     )
+
+
+def test_T_CONFIG_05_demo_password_is_optional_and_read_from_the_env_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("CODEQUEST_DEMO_PASSWORD", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("CODEQUEST_DEMO_PASSWORD=senha-dos-alunos\n", encoding="utf-8")
+    required = {"DATABASE_URL": "postgresql+psycopg://x", "JWT_SECRET": "s"}
+
+    assert Settings(_env_file=None, **required).CODEQUEST_DEMO_PASSWORD is None
+    assert Settings(_env_file=env_file, **required).CODEQUEST_DEMO_PASSWORD == "senha-dos-alunos"

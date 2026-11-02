@@ -69,6 +69,11 @@ class MissionRepository:
         query = select(Mission).where(Mission.classroom_id == classroom_id, student_visible())
         return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
 
+    def visible_base(self) -> list[Mission]:
+        """The base game missions that students can see."""
+        query = select(Mission).where(Mission.classroom_id.is_(None), student_visible())
+        return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
+
     def delete(self, mission: Mission) -> None:
         self.session.delete(mission)
         self.session.flush()

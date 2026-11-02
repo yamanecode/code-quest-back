@@ -23,7 +23,7 @@ docker compose up -d db               # PostgreSQL on localhost:5432
 uv sync                               # create .venv and install the locked dependencies
 uv run alembic upgrade head           # create the tables
 uv run python -m app.cli load-base content/base
-uv run python -m app.cli seed-demo    # optional demonstration data
+uv run python -m app.cli seed-demo    # optional demonstration data (add --students for six students)
 uv run uvicorn app.main:app --reload  # http://localhost:8000/docs
 ```
 
@@ -50,6 +50,7 @@ Settings are read from environment variables or from `.env` (never committed; se
 | `LLM_REASONING_EFFORT` | | Optional `reasoning_effort` sent to reasoning models (e.g. `low`), so hidden reasoning does not use up the reply |
 | `FAKE_LLM_LOG` | | When set, the fake provider appends every prompt it receives to this file |
 | `CODEQUEST_PROFESSOR_PASSWORD` | | Password used by `create-professor`, `reset-password` and `seed-demo`; prompted when empty |
+| `CODEQUEST_DEMO_PASSWORD` | | Password of the demo students of `seed-demo --students`; prompted when empty in a terminal, an error without one |
 
 When the language model fails or times out, hints fall back to fixed texts, so the application keeps working without a provider.
 
@@ -61,6 +62,7 @@ When the language model fails or times out, hints fall back to fixed texts, so t
 | `uv run python -m app.cli reset-password <username>` | Sets a new password for a professor or a student (for example one who lost both the password and the recovery code). |
 | `uv run python -m app.cli load-base content/base` | Loads the base game: the badges, the internal `codequest` account (which cannot log in) and every `content/base/*.json` file as a published mission visible to every student. All files are validated first; any rule violation aborts the load, naming the file and the challenge, and nothing is stored. Every mission and challenge in the files has a `key`; running the command again creates what is new and updates text changes, and it stops (naming the challenge) when the structure of a challenge that students already answered was changed. |
 | `uv run python -m app.cli seed-demo` | Creates demonstration data: the badges, professor `prof_demo`, turma "Turma Demo" (join code `DEMO01`) and the published mission "Missão de exemplo" with one challenge of each type. Running it again creates only what is missing. |
+| `uv run python -m app.cli seed-demo --students` | Also creates six students, `demo_aluno1` to `demo_aluno6`, members of "Turma Demo", with answers on the demo and base challenges (some after wrong answers) dated between Monday 00:00 of the current week and now, so rankings, badges and the class goal have data. Needs the base game loaded first. The answers go through the normal grading, XP and badge rules; no hint is generated and the model is never called. Students that already exist are left as they are. |
 | `uv run alembic upgrade head` | Applies the database migrations. |
 
 ### Base game files

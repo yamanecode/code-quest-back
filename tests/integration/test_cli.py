@@ -1,3 +1,4 @@
+import io
 import shutil
 from pathlib import Path
 
@@ -81,13 +82,76 @@ def test_T_CLI_03_main_parses_create_professor(monkeypatch):
 
 def test_T_CLI_03_main_parses_seed_demo_and_load_base(monkeypatch):
     calls = []
-    monkeypatch.setattr(cli, "seed_demo", lambda session: calls.append("seed") or 0)
+    monkeypatch.setattr(cli, "seed_demo", lambda session, students: calls.append("seed") or 0)
     monkeypatch.setattr(cli, "load_base", lambda session, path: calls.append(path) or 0)
     monkeypatch.setattr(cli, "open_session", lambda: _NullSession())
 
     assert cli.main(["seed-demo"]) == 0
     assert cli.main(["load-base", "content/base"]) == 0
     assert calls == ["seed", "content/base"]
+
+
+def test_T_CLI_05_main_passes_the_students_option_to_seed_demo(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "seed_demo", lambda session, students: calls.append(students) or 0)
+    monkeypatch.setattr(cli, "open_session", lambda: _NullSession())
+
+    assert cli.main(["seed-demo"]) == 0
+    assert cli.main(["seed-demo", "--students"]) == 0
+    assert calls == [False, True]
+
+
+class _Terminal(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def students(session) -> list[str]:
+    query = select(User.username).where(User.role == Role.STUDENT).order_by(User.username)
+    return list(session.scalars(query))
+
+
+def test_T_CLI_05_student_password_from_env(session, monkeypatch, capsys):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+    monkeypatch.setenv("CODEQUEST_DEMO_PASSWORD", "senha-dos-alunos")
+    cli.load_base(session, str(BASE_DIR))
+
+    assert cli.seed_demo(session, students=True) == 0
+
+    assert "estudante demo_aluno6" in capsys.readouterr().out
+    assert len(students(session)) == 6
+    student = session.scalar(select(User).where(User.username == "demo_aluno1"))
+    assert verify_password("senha-dos-alunos", student.password_hash)
+
+
+def test_T_CLI_05_student_password_prompted_in_a_terminal(session, monkeypatch):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+    monkeypatch.delenv("CODEQUEST_DEMO_PASSWORD", raising=False)
+    monkeypatch.setattr("sys.stdin", _Terminal())
+    monkeypatch.setattr(cli, "getpass", lambda prompt: "senha-digitada")
+    cli.load_base(session, str(BASE_DIR))
+
+    assert cli.seed_demo(session, students=True) == 0
+
+    student = session.scalar(select(User).where(User.username == "demo_aluno1"))
+    assert verify_password("senha-digitada", student.password_hash)
+
+
+def test_T_CLI_05_no_student_password_and_no_terminal_fails(session, monkeypatch, capsys):
+    monkeypatch.setenv("CODEQUEST_PROFESSOR_PASSWORD", PASSWORD)
+    monkeypatch.delenv("CODEQUEST_DEMO_PASSWORD", raising=False)
+    monkeypatch.setattr("sys.stdin", io.StringIO())
+
+    def no_prompt(prompt):
+        raise AssertionError("never prompts without a terminal")
+
+    monkeypatch.setattr(cli, "getpass", no_prompt)
+    cli.load_base(session, str(BASE_DIR))
+
+    assert cli.seed_demo(session, students=True) == 1
+
+    assert "Defina CODEQUEST_DEMO_PASSWORD" in capsys.readouterr().err
+    assert students(session) == []
 
 
 def test_T_SEED_01_cli_seeds_once_with_password_from_env(session, monkeypatch, capsys):

@@ -1,9 +1,14 @@
 import pytest
 from sqlalchemy import func, select
 
-from app.domain.challenge_types import SKILL_LABELS, ChallengeType
+from app.domain.challenge_types import SKILL_LABELS, ChallengeType, student_ids
 from app.domain.enums import ContentStatus
-from app.infra.db.models import Submission, UserBadge, XPEvent
+from app.infra.db.models import HintEvent, Submission, UserBadge, XPEvent
+from app.services.ai_service import AIService
+from app.services.classroom_service import ClassroomService
+from app.services.content_service import ContentService
+from app.services.gamification_service import GamificationService
+from app.services.play_service import PlayService, view_seed
 from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
@@ -441,3 +446,23 @@ def test_T_STU_SUBMIT_08_level_up_when_crossing_60_xp(client, session, student, 
     )
     assert "level_3" in {badge["code"] for badge in body["new_badges"]}
     assert solve(client, headers, after).json()["level_up"] is False
+
+
+def test_T_STU_SUBMIT_09_wrong_answer_without_the_hint_step(session, student, clock, llm):
+    """Option used only by the demo seed: the answer is stored, no model call, no hint row."""
+    gamification = GamificationService(session, clock)
+    ai = AIService(session, clock, llm, ContentService(session, clock), 15)
+    play = PlayService(
+        session, clock, gamification, ClassroomService(session, clock, gamification), ai
+    )
+    challenge = make_challenge(
+        session, challenge_type=ChallengeType.PATTERN, missions=(make_mission(session),)
+    )
+    shown = student_ids(challenge.type, challenge.content, view_seed(challenge.id, student.id))
+
+    result = play.submit(student.id, challenge.id, {"option": shown["b"]}, hint_after_wrong=False)
+
+    assert (result.is_correct, result.hint) == (False, None)
+    assert rows(session, Submission, user_id=student.id) == 1
+    assert rows(session, HintEvent, user_id=student.id) == 0
+    assert llm.prompts == []

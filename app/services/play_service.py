@@ -264,7 +264,11 @@ class PlayService:
             ],
         )
 
-    def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
+    def submit(
+        self, user_id: int, challenge_id: int, answer: dict, *, hint_after_wrong: bool = True
+    ) -> SubmissionResult:
+        """Grades and stores an answer. `hint_after_wrong=False` skips the automatic hint
+        (no model call); only the demo seed uses it."""
         # One student's writes run one at a time: a parallel submit waits here and then
         # sees this one's commit, so "already solved" below is checked against fresh data.
         lock_user(self.session, user_id)
@@ -293,7 +297,9 @@ class PlayService:
             new_badges = self.gamification.award_new_badges(user_id)
         # Saved before any model call: a slow or failing AI never loses the answer.
         self.session.commit()
-        hint = None if is_correct else self._hint_after_wrong(user_id, challenge, answer)
+        hint = None
+        if not is_correct and hint_after_wrong:
+            hint = self._hint_after_wrong(user_id, challenge, answer)
 
         xp = before.xp + xp_earned
         level = level_for(xp)

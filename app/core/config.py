@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     FAKE_LLM_LOG: str | None = None
     # Used only by the professor commands of app.cli; prompted when empty.
     CODEQUEST_PROFESSOR_PASSWORD: str | None = None
+    # Used only by `app.cli seed-demo --students`; prompted when empty and in a terminal.
+    CODEQUEST_DEMO_PASSWORD: str | None = None
 
 
 @lru_cache
