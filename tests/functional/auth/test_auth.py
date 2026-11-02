@@ -89,9 +89,8 @@ def test_FT_AUTH_04_no_endpoint_creates_a_professor(anonymous):
         for operation in path.values()
         if "requestBody" in operation
     ]
-    account_paths = [path for path in spec["paths"] if path.startswith("/api/auth/")]
 
-    assert sorted(account_paths) == ["/api/auth/login", "/api/auth/register"]
+    assert request_bodies
     assert all("role" not in schemas[name].get("properties", {}) for name in request_bodies)
 
     username = unique()

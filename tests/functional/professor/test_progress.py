@@ -42,11 +42,10 @@ def test_FT_PROF_07_progress_matches_what_students_did(professor: Account, new_s
     assert rows[alice.username] == {
         "username": alice.username,
         "xp_in_class": 30,
-        "level": 1,
+        "level": 2,
         "solved_in_class": 3,
         "missions_completed_in_class": 2,
         "hints_used": 1,
-        "streak": 1,
     }
     assert rows[bruno.username] == {
         "username": bruno.username,
@@ -55,7 +54,6 @@ def test_FT_PROF_07_progress_matches_what_students_did(professor: Account, new_s
         "solved_in_class": 1,
         "missions_completed_in_class": 0,
         "hints_used": 0,
-        "streak": 1,
     }
     assert rows[carla.username] == {
         "username": carla.username,
@@ -64,7 +62,6 @@ def test_FT_PROF_07_progress_matches_what_students_did(professor: Account, new_s
         "solved_in_class": 0,
         "missions_completed_in_class": 0,
         "hints_used": 0,
-        "streak": 0,
     }
     assert body["completed_all_pct"] == 33
 

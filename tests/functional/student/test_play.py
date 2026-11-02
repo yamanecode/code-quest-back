@@ -1,6 +1,7 @@
 import pytest
 
 from tests.functional.helpers import (
+    TITLE_STEPS,
     TYPES,
     Account,
     LlmLog,
@@ -10,6 +11,7 @@ from tests.functional.helpers import (
     correct_answer,
     create_challenge,
     fail,
+    fill_schema,
     has_key,
     item_texts,
     join,
@@ -65,6 +67,8 @@ def test_FT_STU_01_student_sees_base_missions_and_joined_class_missions(
                     "description": turma.mission["description"],
                     "total": 2,
                     "solved": 0,
+                    "is_new": True,
+                    "has_new_challenges": False,
                 }
             ],
         }
@@ -189,14 +193,14 @@ def test_FT_STU_07_profile_has_every_field(professor: Account, student: Account)
     assert me["role"] == "student"
     assert me["xp"] == 15
     assert me["level"] == 1
-    assert me["title"] == "Aprendiz"
-    assert me["xp_to_next_level"] == 35
-    assert me["streak"] == 1
+    assert me["title"] == "Iniciante"
+    assert me["xp_to_next_level"] == 15
+    assert me["title_steps"] == TITLE_STEPS
     assert me["missions_completed"] == 1
     assert me["solved_by_skill"] == {"ordering": 1, "grouping": 0, "filtering": 0, "pattern": 1}
     assert me["first_try_solves"] == 1
     assert me["profile_public"] is False
-    assert len(me["badges"]) == 30
+    assert len(me["badges"]) == 26
 
 
 @pytest.mark.req("RF-21")
@@ -220,22 +224,27 @@ def test_FT_STU_09_no_free_text_reaches_the_ai(
     professor: Account, student: Account, llm_log: LlmLog
 ):
     spec = student.client.get("/openapi.json").json()
-    student_bodies = {
-        operation["requestBody"]["content"]["application/json"]["schema"]["$ref"].split("/")[-1]
+    schemas = spec["components"]["schemas"]
+    student_operations = [
+        (method, path, operation["requestBody"]["content"]["application/json"]["schema"])
         for path, item in spec["paths"].items()
         if not path.startswith("/api/professor")
-        for operation in item.values()
+        for method, operation in item.items()
         if "requestBody" in operation
-    }
+    ]
     assert "requestBody" not in spec["paths"]["/api/challenges/{challenge_id}/hints"]["post"]
-    assert student_bodies == {"Credentials", "JoinRequest", "SettingsIn", "SubmissionIn"}
+    assert student_operations
 
     turma = turma_with_mission(professor, ("ordering",))
     challenge = turma.challenges[0]
     join(student, turma.join_code)
-    secret = f"mensagem livre {unique()}"
+    secret = unique("m")
     mark = llm_log.mark()
 
+    for method, path, schema in student_operations:
+        url = path.format(challenge_id=challenge["id"])
+        sent = student.client.request(method, url, json=fill_schema(schema, schemas, secret))
+        assert sent.status_code < 500, sent.text
     hint = student.client.post(
         f"/api/challenges/{challenge['id']}/hints", json={"pergunta": secret, "texto": secret}
     )
@@ -244,8 +253,10 @@ def test_FT_STU_09_no_free_text_reaches_the_ai(
 
     assert hint.status_code == 200, hint.text
     assert submission.status_code in (200, 422), submission.text
+    after_wrong = send(student, challenge, wrong_answer("ordering", challenge["content"]))
+    assert after_wrong.status_code == 200, after_wrong.text
     prompts = llm_log.since(mark)
-    assert prompts, "the hint request did not reach the language model"
+    assert len(prompts) >= 2, "the hints did not reach the language model"
     assert all(secret not in prompt for prompt in prompts)
 
 
@@ -263,7 +274,7 @@ def test_FT_STU_10_no_student_response_contains_the_solution(
         student.client.get("/api/missions"),
         student.client.get(f"/api/missions/{turma.mission['id']}"),
         student.client.get(f"/api/challenges/{challenge['id']}"),
-        student.client.get("/api/daily-challenge"),
+        student.client.get("/api/me/continue"),
         request_hint(student, challenge["id"]),
         send(student, challenge, wrong_answer(challenge_type, content)),
         send(student, challenge, correct_answer(challenge_type, content)),

@@ -23,6 +23,13 @@ SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 
 TYPES = ("ordering", "grouping", "filtering", "pattern")
 STUDENT_PASSWORD = "senha-segura-123"
+TITLE_STEPS = [
+    {"title": "Iniciante", "min_level": 1, "max_level": 2},
+    {"title": "Aprendiz", "min_level": 3, "max_level": 4},
+    {"title": "Praticante", "min_level": 5, "max_level": 7},
+    {"title": "Especialista", "min_level": 8, "max_level": 10},
+    {"title": "Mestre", "min_level": 11, "max_level": None},
+]
 
 # Common English words: a Portuguese error message must not contain them.
 ENGLISH_WORDS = re.compile(
@@ -60,13 +67,19 @@ def login(username: str, password: str) -> Account:
     )
 
 
-def signup_student() -> Account:
-    username = unique()
+def register(username: str, password: str = STUDENT_PASSWORD) -> dict:
+    """Sign up a student; returns the sign-up body, which carries the recovery code."""
     with new_client() as anonymous:
         response = anonymous.post(
-            "/api/auth/register", json={"username": username, "password": STUDENT_PASSWORD}
+            "/api/auth/register", json={"username": username, "password": password}
         )
     assert response.status_code == 201, response.text
+    return response.json()
+
+
+def signup_student() -> Account:
+    username = unique()
+    register(username)
     return login(username, STUDENT_PASSWORD)
 
 
@@ -380,6 +393,28 @@ def has_key(value: Any, key: str) -> bool:
     return False
 
 
+def fill_schema(schema: dict, schemas: dict, text: str) -> Any:
+    """A request body for an OpenAPI schema with `text` in every free-form string."""
+    if "$ref" in schema:
+        return fill_schema(schemas[schema["$ref"].split("/")[-1]], schemas, text)
+    if "anyOf" in schema:
+        options = [option for option in schema["anyOf"] if option.get("type") != "null"]
+        return fill_schema(options[0], schemas, text)
+    kind = schema.get("type")
+    if kind == "object":
+        properties = schema.get("properties")
+        if not properties:
+            return {"mensagem": text}
+        return {name: fill_schema(value, schemas, text) for name, value in properties.items()}
+    if kind == "array":
+        return [fill_schema(schema.get("items", {}), schemas, text)]
+    if kind == "boolean":
+        return False
+    if kind == "integer":
+        return 1
+    return text
+
+
 def monday_sao_paulo(today: date | None = None) -> date:
     today = today or datetime.now(SAO_PAULO).date()
     return today - timedelta(days=today.weekday())
@@ -412,6 +447,14 @@ def base_challenge(title: str, statement: str) -> dict:
         for challenge in mission["challenges"]
         if challenge["title"] == title and challenge["statement"] == statement
     )
+
+
+def base_as_challenge(student: Account, challenge_id: int) -> dict:
+    """A base challenge in the shape `send` and `solve` expect, with the stored content."""
+    view = student.client.get(f"/api/challenges/{challenge_id}")
+    assert view.status_code == 200, view.text
+    source = base_challenge(view.json()["title"], view.json()["statement"])
+    return {"id": challenge_id, "type": view.json()["type"], "content": source["content"]}
 
 
 class LlmLog:

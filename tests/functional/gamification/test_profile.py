@@ -3,11 +3,13 @@ import pytest
 from tests.functional.helpers import (
     Account,
     assert_error,
-    base_challenge,
-    correct_answer,
+    base_as_challenge,
+    create_challenge,
+    fail,
     join,
+    new_classroom,
     profile,
-    send,
+    publish_mission,
     solve,
     turma_with_mission,
     unique,
@@ -16,64 +18,133 @@ from tests.functional.helpers import (
 pytestmark = pytest.mark.functional
 
 
-def daily(student: Account) -> dict:
-    response = student.client.get("/api/daily-challenge")
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def visible_challenge_ids(student: Account) -> set[int]:
-    listing = student.client.get("/api/missions").json()
-    mission_ids = [m["id"] for m in listing["base"]] + [
-        m["id"] for classroom in listing["classrooms"] for m in classroom["missions"]
-    ]
-    return {
-        challenge["id"]
-        for mission_id in mission_ids
-        for challenge in student.client.get(f"/api/missions/{mission_id}").json()["challenges"]
-    }
-
-
 def set_public(student: Account, value: bool) -> None:
     response = student.client.put("/api/me/settings", json={"profile_public": value})
     assert response.status_code == 200, response.text
     assert response.json() == {"profile_public": value}
 
 
+def missions(student: Account) -> dict:
+    response = student.client.get("/api/missions")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def mission_challenges(student: Account, mission_id: int) -> list[dict]:
+    response = student.client.get(f"/api/missions/{mission_id}")
+    assert response.status_code == 200, response.text
+    return response.json()["challenges"]
+
+
+def class_mission(student: Account, classroom_id: int) -> dict:
+    classroom = next(c for c in missions(student)["classrooms"] if c["id"] == classroom_id)
+    return classroom["missions"][0]
+
+
+def is_new(student: Account, challenge_id: int) -> bool:
+    response = student.client.get(f"/api/challenges/{challenge_id}")
+    assert response.status_code == 200, response.text
+    return response.json()["is_new"]
+
+
+def continue_card(student: Account) -> dict | None:
+    response = student.client.get("/api/me/continue")
+    if response.status_code == 204:
+        return None
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def card(mission: dict, challenge: dict, new: bool) -> dict:
+    return {
+        "mission_id": mission["id"],
+        "mission_title": mission["title"],
+        "challenge_id": challenge["id"],
+        "challenge_title": challenge["title"],
+        "is_new": new,
+    }
+
+
 @pytest.mark.req("RF-10")
-def test_FT_GAME_10_streak_starts_at_zero_and_counts_today(professor: Account, student: Account):
-    assert profile(student)["streak"] == 0
+def test_FT_GAME_10_recent_class_content_is_new_until_answered(
+    professor: Account, student: Account
+):
     turma = turma_with_mission(professor, ("ordering", "pattern"))
+    first, second = turma.challenges
+    mission_id = turma.mission["id"]
     join(student, turma.join_code)
 
-    solve(student, turma.challenges[0])
-    solve(student, turma.challenges[1])
+    summary = class_mission(student, turma.id)
+    assert (summary["is_new"], summary["has_new_challenges"]) == (True, False)
+    assert [c["is_new"] for c in mission_challenges(student, mission_id)] == [True, True]
+    assert is_new(student, first["id"]) is True
 
-    me = profile(student)
-    assert me["streak"] == 1
-    assert me["xp"] == 20
+    fail(student, first)
+
+    assert is_new(student, first["id"]) is False
+    assert is_new(student, second["id"]) is True
+    assert [c["is_new"] for c in mission_challenges(student, mission_id)] == [False, True]
+    assert class_mission(student, turma.id)["is_new"] is False
+
+    solve(student, first)
+    solve(student, second)
+    assert class_mission(student, turma.id)["has_new_challenges"] is False
+    added = create_challenge(professor, "filtering")
+    response = professor.client.put(
+        f"/api/professor/missions/{mission_id}/challenges",
+        json={"challenge_ids": [first["id"], second["id"], added["id"]]},
+    )
+    assert response.status_code == 200, response.text
+
+    summary = class_mission(student, turma.id)
+    assert (summary["is_new"], summary["has_new_challenges"]) == (False, True)
+    assert [c["is_new"] for c in mission_challenges(student, mission_id)] == [False, False, True]
+
+    for mission in missions(student)["base"]:
+        assert (mission["is_new"], mission["has_new_challenges"]) == (False, False)
+        challenges = mission_challenges(student, mission["id"])
+        assert not any(challenge["is_new"] for challenge in challenges)
+    assert is_new(student, challenges[0]["id"]) is False
 
 
 @pytest.mark.req("RF-11")
-def test_FT_GAME_11_daily_challenge_is_unsolved_visible_and_stable_today(student: Account):
-    first = daily(student)
+@pytest.mark.req("SG-07")
+def test_FT_GAME_11_continue_card_points_to_the_next_unsolved_challenge(
+    professor: Account, student: Account
+):
+    base = missions(student)["base"]
+    first_base = mission_challenges(student, base[0]["id"])
+    assert continue_card(student) == card(base[0], first_base[0], False)
 
-    assert first["all_solved"] is False
-    challenge = first["challenge"]
-    assert set(challenge) == {"id", "title", "type", "skill", "solved"}
-    assert challenge["solved"] is False
-    assert challenge["id"] in visible_challenge_ids(student)
-    assert daily(student) == first
+    classroom = new_classroom(professor)
+    older_challenges = [create_challenge(professor, t) for t in ("ordering", "pattern")]
+    newer_challenges = [create_challenge(professor, t) for t in ("grouping", "filtering")]
+    older = publish_mission(professor, classroom["id"], [c["id"] for c in older_challenges])
+    newer = publish_mission(professor, classroom["id"], [c["id"] for c in newer_challenges])
+    join(student, classroom["join_code"])
+    assert continue_card(student) == card(newer, newer_challenges[0], True)
 
-    view = student.client.get(f"/api/challenges/{challenge['id']}").json()
-    source = base_challenge(view["title"], view["statement"])
-    base = {"id": challenge["id"], "type": view["type"], "content": source["content"]}
-    response = send(student, base, correct_answer(view["type"], source["content"]))
-    assert response.json()["is_correct"] is True
+    second_base = mission_challenges(student, base[1]["id"])
+    target = base_as_challenge(student, second_base[0]["id"])
+    fail(student, target)
+    assert continue_card(student) == card(base[1], second_base[0], False)
 
-    after = daily(student)
-    assert after["all_solved"] is False
-    assert after["challenge"] == challenge | {"solved": True}
+    solve(student, newer_challenges[0])
+    assert continue_card(student) == card(newer, newer_challenges[1], True)
+    solve(student, newer_challenges[1])
+    assert continue_card(student) == card(older, older_challenges[0], True)
+    for challenge in older_challenges:
+        solve(student, challenge)
+    assert continue_card(student) == card(base[0], first_base[0], False)
+
+    for mission in base:
+        for challenge in mission_challenges(student, mission["id"]):
+            solve(student, base_as_challenge(student, challenge["id"]))
+    xp = profile(student)["xp"]
+
+    assert continue_card(student) is None
+    assert continue_card(student) is None
+    assert profile(student)["xp"] == xp
 
 
 @pytest.mark.req("RF-20")
