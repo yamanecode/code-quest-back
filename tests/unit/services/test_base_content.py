@@ -54,7 +54,7 @@ def test_T_BASE_01_real_base_files_pass_the_template_rules():
 
     assert [mission.position for mission in missions] == [1, 2, 3, 4, 5]
     types = Counter(c.draft.type for mission in missions for c in mission.challenges)
-    assert types == {challenge_type: 7 for challenge_type in ChallengeType}
+    assert types == dict.fromkeys(ChallengeType, 7)
 
 
 def test_T_BASE_01_files_are_read_in_name_order(tmp_path):

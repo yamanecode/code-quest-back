@@ -125,7 +125,7 @@ BROKEN_PAYLOADS = {
         "grouping",
         lambda p: p["content"].update(
             groups=[{"id": "g1", "text": "Tudo"}],
-            solution={k: "g1" for k in p["content"]["solution"]},
+            solution=dict.fromkeys(p["content"]["solution"], "g1"),
         ),
     ),
     "grouping_three_items": broken("grouping", _grouping_items(3)),

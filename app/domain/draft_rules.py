@@ -8,6 +8,7 @@ challenges are not checked here.
 import re
 from collections.abc import Callable
 from decimal import Decimal
+from itertools import pairwise
 
 from app.domain.challenge_types import ChallengeDraft, ChallengeType
 from app.domain.hint_leak import hint_reveals_solution, normalize
@@ -111,7 +112,7 @@ def _constant_step(sequence: list[str]) -> bool:
     if not all(_NUMBER.fullmatch(term.strip()) for term in sequence):
         return False
     numbers = [Decimal(term.strip().replace(",", ".")) for term in sequence]
-    steps = {after - before for before, after in zip(numbers, numbers[1:], strict=False)}
+    steps = {after - before for before, after in pairwise(numbers)}
     return len(steps) == 1
 
 

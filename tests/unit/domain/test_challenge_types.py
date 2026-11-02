@@ -85,7 +85,7 @@ def test_T_DOM_RULES_05_grouping_solution_assigns_every_item_and_uses_every_grou
     unknown_group = grouping()
     unknown_group["solution"]["a"] = "g9"
     unused_group = grouping()
-    unused_group["solution"] = {item_id: "g1" for item_id in unused_group["solution"]}
+    unused_group["solution"] = dict.fromkeys(unused_group["solution"], "g1")
     not_a_dict = grouping()
     not_a_dict["solution"] = ["g1", "g2"]
     non_text_group = grouping()
