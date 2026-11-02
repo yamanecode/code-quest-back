@@ -57,7 +57,7 @@ def test_T_DOM_LEAK_04_grouping_hint_missing_an_item_is_safe():
 
 def test_T_DOM_LEAK_05_filtering_hint_with_every_relevant_item_leaks():
     leaking = "Use o preço da passagem e a taxa de embarque."
-    safe = "O preço da passagem importa. E a cor do ônibus?"
+    safe = "O preço da passagem importa. O que mais entra na conta?"
     assert hint_reveals_solution(ChallengeType.FILTERING, FILTERING, leaking)
     assert not hint_reveals_solution(ChallengeType.FILTERING, FILTERING, safe)
 
@@ -82,3 +82,29 @@ def test_T_DOM_LEAK_08_pattern_option_must_be_a_whole_token():
     words = {**PATTERN, "options": [{"id": "a", "text": "par"}], "solution": "a"}
     assert not hint_reveals_solution(ChallengeType.PATTERN, words, "Compare os números.")
     assert hint_reveals_solution(ChallengeType.PATTERN, words, "É um número par.")
+
+
+def test_T_DOM_LEAK_09_filtering_hint_with_every_unnecessary_item_leaks():
+    # Naming everything to ignore leaves only the answer to select.
+    hint = "Ignore a COR DO ONIBUS."
+    assert hint_reveals_solution(ChallengeType.FILTERING, FILTERING, hint)
+
+
+def test_T_DOM_LEAK_10_filtering_hint_with_only_some_unnecessary_items_is_safe():
+    content = {
+        **FILTERING,
+        "items": [*FILTERING["items"], {"id": "d", "text": "Nome do motorista"}],
+    }
+    hint = "A cor do ônibus muda alguma coisa no valor?"
+    assert not hint_reveals_solution(ChallengeType.FILTERING, content, hint)
+
+
+def test_T_DOM_LEAK_11_grouping_hint_placing_all_but_one_item_is_not_detected():
+    # Declared limitation: only a hint naming every item is caught.
+    content = {
+        **GROUPING,
+        "items": [*GROUPING["items"], {"id": "c", "text": "Assistir ao filme"}],
+        "solution": {**GROUPING["solution"], "c": "g2"},
+    }
+    hint = "Comprar ingressos vem antes; guardar a pipoca vem depois. E o resto?"
+    assert not hint_reveals_solution(ChallengeType.GROUPING, content, hint)

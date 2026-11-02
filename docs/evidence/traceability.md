@@ -31,7 +31,7 @@ passed: 41 · failed: 0 · MISSING: 0 · manual: 3
 | RF-23 | Account recovery with a recovery code, without e-mail | `tests/functional/auth/test_recovery.py::test_FT_AUTH_10_recovery_code_resets_the_password_once`<br>`tests/functional/auth/test_recovery.py::test_FT_AUTH_11_reset_answers_the_same_for_every_mismatch`<br>`tests/functional/auth/test_recovery.py::test_FT_AUTH_12_new_code_needs_the_password_and_replaces_the_old_one` | passed |
 | SG-01 | The hint request to the AI contains the statement, the solution, the level and the instruction not to reveal it | `tests/functional/ai/test_prompts.py::test_FT_AI_10_hint_request_holds_statement_solution_level_and_instruction` | passed |
 | SG-02 | No free-text channel from the student to the AI | `tests/functional/student/test_play.py::test_FT_STU_09_no_free_text_reaches_the_ai` | passed |
-| SG-03 | A hint that contains the solution is discarded | `tests/functional/ai/test_prompts.py::test_FT_AI_11_hint_with_the_solution_is_replaced_by_the_fallback` | passed |
+| SG-03 | A hint that contains the solution is discarded | `tests/functional/ai/test_prompts.py::test_FT_AI_11_hint_with_the_solution_is_replaced_by_the_fallback`<br>`tests/functional/ai/test_prompts.py::test_FT_AI_17_filtering_hint_naming_every_irrelevant_item_is_replaced` | passed |
 | SG-04 | Hint wait enforced | `tests/functional/ai/test_hints.py::test_FT_AI_02_request_before_the_wait_returns_429` | passed |
 | SG-05 | No AI draft reaches students without professor approval | `tests/functional/ai/test_professor_ai.py::test_FT_AI_12_draft_stays_hidden_from_students_until_published` | passed |
 | SG-06 | No personal data in any request to the AI | `tests/functional/ai/test_prompts.py::test_FT_AI_13_no_personal_data_reaches_the_ai` | passed |
@@ -44,7 +44,7 @@ passed: 41 · failed: 0 · MISSING: 0 · manual: 3
 | SG-11 | Game elements are not shown in isolation | — | manual |
 | SG-12 | Base challenges need no programming knowledge | — | manual |
 | SG-13 | Public profile is private by default and minimal | `tests/functional/gamification/test_profile.py::test_FT_GAME_15_public_profile_is_off_by_default_and_opt_in`<br>`tests/functional/gamification/test_profile.py::test_FT_GAME_16_public_profile_has_exactly_the_minimal_fields` | passed |
-| SG-14 | AI drafts follow published task-writing rules (Bebras criteria; Haladyna, Downing and Rodriguez, 2002) | `tests/functional/ai/test_professor_ai.py::test_FT_AI_16_a_too_easy_draft_is_rejected_with_the_broken_rules` | passed |
+| SG-14 | AI drafts follow the project's task-writing rules (a design decision that complements the professor's review) | `tests/functional/ai/test_professor_ai.py::test_FT_AI_16_a_too_easy_draft_is_rejected_with_the_broken_rules` | passed |
 | RNF-01 | Layered architecture enforced by automated checks | — | manual |
 | RNF-02 | AI provider replaceable by configuration | `tests/functional/ai/test_prompts.py::test_FT_AI_14_server_uses_the_provider_chosen_by_configuration` | passed |
 | RNF-03 | The application keeps working when the AI fails | `tests/functional/ai/test_prompts.py::test_FT_AI_15_application_keeps_working_when_the_ai_fails` | passed |

@@ -57,8 +57,7 @@ REVIEW_SYSTEM = (
     "em no máximo 5 tópicos curtos."
 )
 
-# Audience and task criteria from Bebras (Dagienė and Futschek, 2008); options and
-# distractors from Haladyna, Downing and Rodriguez (2002). The checkable part is in
+# What makes a good draft for this audience. The checkable part is in
 # app/domain/draft_rules.py; the rest can only be asked for here.
 DRAFT_SYSTEM = (
     "Você cria rascunhos de desafios de pensamento computacional sem código, em português do "

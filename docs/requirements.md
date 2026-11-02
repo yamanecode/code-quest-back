@@ -49,7 +49,7 @@ Each requirement has an ID, the requirement and its acceptance criterion. Functi
 | SG-11 | Game elements are not shown in isolation | MANUAL: inspect the student screens; badges always appear next to XP, level and title. |
 | SG-12 | Base challenges need no programming knowledge | MANUAL: inspect the base game statements against the Bebras criteria cited in the text. |
 | SG-13 | Public profile is private by default and minimal | A new account has `profile_public: false`; the public profile response has exactly the fields username, level, title and badges. |
-| SG-14 | AI drafts follow published task-writing rules (Bebras criteria; Haladyna, Downing and Rodriguez, 2002) | An AI draft that breaks a draft rule (for example, an ordering challenge with fewer than 5 steps) is not saved: the request returns 422 with the broken rules; a draft that follows them is saved as a draft. |
+| SG-14 | AI drafts follow the project's task-writing rules (a design decision that complements the professor's review) | An AI draft that breaks a draft rule (for example, an ordering challenge with fewer than 5 steps) is not saved: the request returns 422 with the broken rules; a draft that follows them is saved as a draft. |
 
 ## Non-functional requirements
 

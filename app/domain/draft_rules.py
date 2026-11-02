@@ -1,8 +1,8 @@
 """Rules that keep AI drafts from being trivial for the audience (SG-14).
 
-They apply only to AI drafts, after the template rules. Sources: the Bebras criteria for
-good tasks (Dagienė and Futschek, 2008) and the multiple-choice item-writing guidelines of
-Haladyna, Downing and Rodriguez (2002); "H" numbers below are their guideline numbers.
+They are a project decision: a first filter on AI drafts, applied after the template rules,
+that complements the professor's review instead of replacing it. Professor and base
+challenges are not checked here.
 """
 
 import re
@@ -12,7 +12,7 @@ from decimal import Decimal
 from app.domain.challenge_types import ChallengeDraft, ChallengeType
 from app.domain.hint_leak import hint_reveals_solution, normalize
 
-# Not trivial in size (Bebras: a difficulty level adequate for the age; H2, H29).
+# Not trivial in size.
 MIN_ORDERING_STEPS = 5
 MIN_GROUPS = 3
 MIN_GROUPING_ITEMS = 6
@@ -21,11 +21,11 @@ MIN_RELEVANT = 2
 MIN_IRRELEVANT = 2
 MIN_PATTERN_TERMS = 4
 
-# A correct option stands out when it is this much longer than every distractor (H24, H28.4).
+# A correct option stands out when it is this much longer than every distractor.
 CONSPICUOUS_RATIO = 1.5
 CONSPICUOUS_EXTRA_CHARS = 3
 
-# Words that give away a step's place in the order by themselves (H28), already normalized.
+# Words that give away a step's place in the order by themselves, already normalized.
 ORDER_CUES = (
     "primeiro",
     "primeira",
@@ -85,7 +85,7 @@ def _grouping(draft: ChallengeDraft) -> list[str]:
     items = draft.content["items"]
     errors = _at_least(len(groups), MIN_GROUPS, "use pelo menos {} etapas.")
     errors += _at_least(len(items), MIN_GROUPING_ITEMS, "use pelo menos {} itens.")
-    # A clang association (H28.2): the item repeats the name of the group it belongs to.
+    # The item repeats the name of the group it belongs to, which gives the answer away.
     for item in items:
         group = groups[draft.content["solution"][item["id"]]]
         if _contains(item["text"], group):

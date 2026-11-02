@@ -40,8 +40,11 @@ def _grouping_leaks(content: dict, hint: str) -> bool:
 
 
 def _filtering_leaks(content: dict, hint: str) -> bool:
+    # Naming every unnecessary item gives the answer too: the rest is what to select.
     texts = _texts_by_id(content["items"])
-    return _all_appear([texts[item_id] for item_id in content["solution"]], hint)
+    relevant = [texts[item_id] for item_id in content["solution"]]
+    unnecessary = [text for item_id, text in texts.items() if item_id not in content["solution"]]
+    return _all_appear(relevant, hint) or _all_appear(unnecessary, hint)
 
 
 def _pattern_leaks(content: dict, hint: str) -> bool:
@@ -59,5 +62,11 @@ _LEAK_RULES: dict[str, Callable[[dict, str], bool]] = {
 
 
 def hint_reveals_solution(challenge_type: str, content: dict, hint: str) -> bool:
-    """True when the hint contains the solution (SG-03); suggestions are not detected."""
+    """True when the hint contains the solution (SG-03).
+
+    Detected: ordering, every step in the solution order; grouping, every item text;
+    filtering, every relevant item or every unnecessary item; pattern, the correct option
+    as a whole token. Not detected: hints that only suggest the answer, or that give part
+    of it (for example, a grouping hint that places every item but one).
+    """
     return _LEAK_RULES[challenge_type](content, normalize(hint))

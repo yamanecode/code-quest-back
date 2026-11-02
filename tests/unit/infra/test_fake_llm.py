@@ -56,6 +56,20 @@ def test_T_AI_FAKE_02_leak_trigger_returns_a_hint_that_reveals_the_solution(chal
     assert hint_reveals_solution(challenge_type, CONTENT[challenge_type], hint)
 
 
+def test_T_AI_FAKE_02c_leak_rest_trigger_names_only_the_unnecessary_items():
+    fake = FakeLLMClient()
+    content = CONTENT[ChallengeType.FILTERING]
+    statement = "Enunciado [fake:leak-rest] de teste."
+    prompt = hint_prompt(challenge(ChallengeType.FILTERING, statement), 1, [])
+
+    hint = ask(fake, prompt)
+
+    texts = {item["id"]: item["text"] for item in content["items"]}
+    relevant = [texts[item_id] for item_id in content["solution"]]
+    assert hint_reveals_solution(ChallengeType.FILTERING, content, hint)
+    assert not any(text in hint for text in relevant)
+
+
 def test_T_AI_FAKE_02b_error_trigger_makes_every_feature_fail():
     fake = FakeLLMClient()
     broken = challenge(ChallengeType.ORDERING, "Enunciado [fake:error] de teste.")

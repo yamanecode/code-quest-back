@@ -50,10 +50,18 @@ def holds_ordering_solution(prompt: str, content: dict) -> bool:
     return by_text or re.search(as_ids, prompt) is not None
 
 
-def ordering_with_statement(professor: Account, marker: str) -> dict:
-    payload = challenge_payload("ordering")
+def challenge_with_statement(professor: Account, challenge_type: str, marker: str) -> dict:
+    payload = challenge_payload(challenge_type)
     payload["statement"] = f"{marker} {payload['statement']}"
-    return create_challenge(professor, "ordering", payload=payload)
+    return create_challenge(professor, challenge_type, payload=payload)
+
+
+def ordering_with_statement(professor: Account, marker: str) -> dict:
+    return challenge_with_statement(professor, "ordering", marker)
+
+
+def names_all(hint: str, texts: list[str]) -> bool:
+    return all(normalized(text) in normalized(hint) for text in texts)
 
 
 def leaks(hint: str, content: dict) -> bool:
@@ -106,6 +114,32 @@ def test_FT_AI_11_hint_with_the_solution_is_replaced_by_the_fallback(
     assert response.status_code == 200, response.text
     body = response.json()
     assert not leaks(body["hint"], challenge["content"])
+    assert body["hint"] != FAKE_HINT_LEVEL_1
+    assert body["level"] == 1
+    assert len(llm_log.since(mark)) >= 2, "the leaking hint was not retried"
+
+
+@pytest.mark.req("SG-03")
+def test_FT_AI_17_filtering_hint_naming_every_irrelevant_item_is_replaced(
+    professor: Account, student: Account, llm_log: LlmLog
+):
+    challenge = challenge_with_statement(professor, "filtering", "[fake:leak-rest]")
+    classroom = new_classroom(professor)
+    publish_mission(professor, classroom["id"], [challenge["id"]])
+    join(student, classroom["join_code"])
+    texts = item_texts(challenge["content"])
+    relevant = [texts[item] for item in challenge["content"]["solution"]]
+    irrelevant = [
+        text for item, text in texts.items() if item not in challenge["content"]["solution"]
+    ]
+    mark = llm_log.mark()
+
+    response = request_hint(student, challenge["id"])
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert not names_all(body["hint"], irrelevant)
+    assert not names_all(body["hint"], relevant)
     assert body["hint"] != FAKE_HINT_LEVEL_1
     assert body["level"] == 1
     assert len(llm_log.since(mark)) >= 2, "the leaking hint was not retried"

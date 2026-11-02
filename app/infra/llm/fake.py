@@ -128,7 +128,8 @@ class FakeLLMClient:
     Server mode tells the features apart by the lines the prompt builders write
     ("Tema:" for drafts, "Nível da dica:" for hints, anything else is a review).
     Triggers: "[fake:error]" anywhere fails the call, "[fake:leak]" makes a hint echo the
-    prompt (which holds the solution), "[fake:invalid]" makes a draft that is not JSON and
+    prompt (which holds the solution), "[fake:leak-rest]" makes a filtering hint name every
+    unnecessary item, "[fake:invalid]" makes a draft that is not JSON and
     "[fake:easy]" a draft that breaks the draft rules.
 
     `delay_seconds` makes every call slow; a call whose timeout is shorter than the delay
@@ -182,6 +183,8 @@ class FakeLLMClient:
         if level:
             if "[fake:leak]" in user:
                 return user
+            if "[fake:leak-rest]" in user and "Itens relevantes:" in user:
+                return _unnecessary_items_hint(user)
             return SAFE_HINT.format(level=level.group(1))
         return FAKE_REVIEW
 
@@ -193,6 +196,20 @@ class FakeLLMClient:
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+
+def _unnecessary_items_hint(user: str) -> str:
+    """A filtering hint that names every item outside the solution and nothing else."""
+    lines = user.splitlines()
+    start = lines.index("Itens:") + 1
+    items = []
+    for line in lines[start:]:
+        if not line.startswith("- "):
+            break
+        items.append(line[2:])
+    relevant = re.search(r"^Solução: Itens relevantes: (.+)$", user, re.MULTILINE)
+    needed = relevant.group(1).split("; ")
+    return "Não considere: " + ", ".join(item for item in items if item not in needed) + "."
 
 
 def _draft(challenge_type: ChallengeType, topic: str) -> str:

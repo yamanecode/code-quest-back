@@ -79,6 +79,17 @@ def test_T_DOM_DRAFT_03_statement_must_not_give_the_answer():
     assert draft_rule_errors(filtering) == ["O enunciado entrega a resposta."]
 
 
+def test_T_DOM_DRAFT_03_statement_listing_every_irrelevant_item_gives_the_answer():
+    content = DRAFT_CONTENT[ChallengeType.FILTERING]
+    relevant = set(content["solution"])
+    irrelevant = [item["text"] for item in content["items"] if item["id"] not in relevant]
+    statement = "Leia com atenção. Não importam: " + "; ".join(irrelevant) + "."
+
+    assert draft_rule_errors(draft(ChallengeType.FILTERING, content, statement)) == [
+        "O enunciado entrega a resposta."
+    ]
+
+
 @pytest.mark.parametrize(
     "text",
     [
