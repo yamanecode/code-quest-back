@@ -24,7 +24,6 @@ from app.domain.gamification import (
     window_around,
     xp_to_next_level,
 )
-from app.infra.db.models import Classroom
 from app.infra.repositories.badges import BadgeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.hints import HintRepository
@@ -33,6 +32,7 @@ from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.users import UserRepository
 from app.infra.repositories.xp import UserXP, XPRepository
 from app.services.exceptions import NotFound, ValidationFailed
+from app.services.guards import own_classroom
 
 
 @dataclass(frozen=True)
@@ -246,7 +246,7 @@ class GamificationService:
 
     def classroom_ranking(self, professor_id: int, classroom_id: int, period: str) -> Ranking:
         """Full turma ranking for the professor who owns the turma."""
-        self._own_classroom(professor_id, classroom_id)
+        own_classroom(self.classrooms, professor_id, classroom_id)
         since = period_start(RankingPeriod(period), self.clock.now())
         rows = self.xp.xp_in_classroom_since(classroom_id, since)
         entries = _ranking_entries(rows, _ranked(rows), me_id=None)
@@ -255,7 +255,7 @@ class GamificationService:
     # Professor progress table
 
     def classroom_progress(self, professor_id: int, classroom_id: int) -> ClassroomProgress:
-        self._own_classroom(professor_id, classroom_id)
+        own_classroom(self.classrooms, professor_id, classroom_id)
         xp_in_class = {row.user_id: row.xp for row in self.xp.xp_in_classroom_total(classroom_id)}
         published = [
             mission.id
@@ -287,12 +287,6 @@ class GamificationService:
     def _completed_count(missions: list[list[int]], solved: set[int]) -> int:
         return sum(mission_completed(ids, solved) for ids in missions)
 
-    def _own_classroom(self, professor_id: int, classroom_id: int) -> Classroom:
-        classroom = self.classrooms.get(classroom_id)
-        if classroom is None or classroom.professor_id != professor_id:
-            raise NotFound("classroom_not_found", "Turma não encontrada.")
-        return classroom
-
     @staticmethod
     def _profile_badge(badge: Badge, earned_at: datetime | None) -> ProfileBadge:
         name, description = badge_display(badge, earned=earned_at is not None)
@@ -313,7 +307,7 @@ class GamificationService:
         solved = self.submissions.solved_challenge_ids(user_id)
         visible = self.missions.visible_missions(user_id)
         by_mission = self.missions.published_challenge_ids_by_mission(m.id for m in visible)
-        completed = sum(mission_completed(ids, solved) for ids in by_mission.values())
+        completed = self._completed_count(list(by_mission.values()), solved)
         base = [by_mission[m.id] for m in visible if m.classroom_id is None]
         return completed, solved_in_every_mission(base, solved)
 

@@ -25,12 +25,12 @@ from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.services.content_service import ChallengeView, ContentService, draft_of
 from app.services.exceptions import (
-    Conflict,
     NotFound,
     RateLimited,
     ServiceUnavailable,
     ValidationFailed,
 )
+from app.services.guards import already_solved
 from app.services.prompts import (
     Prompt,
     draft_prompt,
@@ -219,7 +219,7 @@ class AIService:
         if challenge_id not in self.missions.visible_published_challenge_ids(user_id):
             raise NotFound("challenge_not_found", "Desafio não encontrado.")
         if self.submissions.has_solved(user_id, challenge_id):
-            raise Conflict("already_solved", "Você já resolveu este desafio.")
+            raise already_solved()
         usage = self.hints.requested_hints(user_id, challenge_id)
         now = self.clock.now()
         wait = cooldown_left(usage.last_shown_at, now, self.cooldown_seconds)

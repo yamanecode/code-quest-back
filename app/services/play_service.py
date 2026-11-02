@@ -21,8 +21,9 @@ from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
 from app.services.ai_service import AIService
 from app.services.classroom_service import ClassroomService
-from app.services.exceptions import Conflict, NotFound, ValidationFailed
+from app.services.exceptions import NotFound, ValidationFailed
 from app.services.gamification_service import BadgeInfo, GamificationService
+from app.services.guards import already_solved
 
 
 @dataclass(frozen=True)
@@ -112,10 +113,6 @@ def view_seed(challenge_id: int, user_id: int) -> str:
     key = get_settings().JWT_SECRET.encode()
     message = f"student-view:{challenge_id}:{user_id}".encode()
     return hmac.new(key, message, hashlib.sha256).hexdigest()
-
-
-def _already_solved() -> Conflict:
-    return Conflict("already_solved", "Você já resolveu este desafio.")
 
 
 def _challenge_is_new(challenge: Challenge, answered: set[int], now: datetime) -> bool:
@@ -251,7 +248,7 @@ class PlayService:
     def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
         challenge = self._visible_challenge(user_id, challenge_id)
         if self.submissions.has_solved(user_id, challenge_id):
-            raise _already_solved()
+            raise already_solved()
         seed = view_seed(challenge.id, user_id)
         try:
             # From here on the answer uses stored ids: storage, grading and the hint prompt.

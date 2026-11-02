@@ -27,6 +27,7 @@ from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.missions import MissionRepository
 from app.services.classroom_service import Goal, class_goal
 from app.services.exceptions import Conflict, NotFound, ValidationFailed
+from app.services.guards import own_classroom
 
 JOIN_CODE_ATTEMPTS = 10
 
@@ -469,11 +470,7 @@ class ContentService:
         raise RuntimeError("could not generate a free join code")
 
     def _own_classroom(self, professor_id: int, classroom_id: int) -> Classroom:
-        classroom = self.classrooms.get(classroom_id)
-        # Another professor's turma looks exactly like a missing one.
-        if classroom is None or classroom.professor_id != professor_id:
-            raise NotFound("classroom_not_found", "Turma não encontrada.")
-        return classroom
+        return own_classroom(self.classrooms, professor_id, classroom_id)
 
     def _own_mission(self, professor_id: int, mission_id: int) -> Mission:
         mission = self.missions.get(mission_id)
