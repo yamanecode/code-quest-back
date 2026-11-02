@@ -19,6 +19,12 @@ class Payload(BaseModel):
     name: str
 
 
+class Form(BaseModel):
+    password: str
+    challenge_ids: list[int]
+    nickname: str
+
+
 def build_client(error: ServiceError | None = None) -> TestClient:
     app = create_app()
 
@@ -29,6 +35,10 @@ def build_client(error: ServiceError | None = None) -> TestClient:
     @app.post("/test/body")
     def needs_body(payload: Payload):
         return payload
+
+    @app.post("/test/form")
+    def needs_form(form: Form):
+        return form
 
     return TestClient(app)
 
@@ -94,7 +104,32 @@ def test_T_API_ERR_04_malformed_request_body_uses_same_shape():
     response = build_client().post("/test/body", json={"wrong": 1})
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "validation_error", "message": "Dados inválidos."}
+    assert response.json() == {
+        "detail": "validation_error",
+        "message": "Dados inválidos.",
+        "errors": ["Campo obrigatório ou inválido: nome."],
+    }
+
+
+def test_T_API_ERR_09_each_wrong_field_is_named_in_portuguese_once():
+    body = {"password": 12345678, "challenge_ids": [1, "x", "y"], "nickname": None}
+
+    response = build_client().post("/test/form", json=body)
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == [
+        "Campo obrigatório ou inválido: senha.",
+        "Campo obrigatório ou inválido: desafios.",
+        "Campo obrigatório ou inválido: um dos campos.",
+    ]
+
+
+def test_T_API_ERR_10_body_that_is_not_json_names_no_field_and_echoes_nothing():
+    response = build_client().post("/test/form", content=b"senha-secreta")
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == ["Campo obrigatório ou inválido: um dos campos."]
+    assert "senha-secreta" not in response.text
 
 
 def test_T_API_ERR_05_unknown_route_uses_same_shape():

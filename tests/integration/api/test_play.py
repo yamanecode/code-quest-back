@@ -451,10 +451,9 @@ def test_T_STU_SUBMIT_08_level_up_when_crossing_60_xp(client, session, student, 
 def test_T_STU_SUBMIT_09_wrong_answer_without_the_hint_step(session, student, clock, llm):
     """Option used only by the demo seed: the answer is stored, no model call, no hint row."""
     gamification = GamificationService(session, clock)
-    ai = AIService(session, clock, llm, ContentService(session, clock), 15)
-    play = PlayService(
-        session, clock, gamification, ClassroomService(session, clock, gamification), ai
-    )
+    goals = ClassroomService(session, clock, gamification)
+    ai = AIService(session, clock, llm, ContentService(session, clock, goals), 15)
+    play = PlayService(session, clock, gamification, goals, ai)
     challenge = make_challenge(
         session, challenge_type=ChallengeType.PATTERN, missions=(make_mission(session),)
     )

@@ -25,7 +25,7 @@ from app.infra.db.models import Challenge, Classroom, Mission
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
 from app.infra.repositories.missions import MissionRepository
-from app.services.classroom_service import Goal, class_goal
+from app.services.classroom_service import ClassroomService, Goal, class_goal
 from app.services.exceptions import Conflict, NotFound, ValidationFailed
 from app.services.guards import own_classroom
 
@@ -155,10 +155,12 @@ class ContentService:
         self,
         session: Session,
         clock: Clock,
+        goals: ClassroomService,
         make_join_code: Callable[[], str] = random_join_code,
     ) -> None:
         self.session = session
         self.clock = clock
+        self.goals = goals
         self.make_join_code = make_join_code
         self.classrooms = ClassroomRepository(session)
         self.missions = MissionRepository(session)
@@ -188,7 +190,11 @@ class ContentService:
         classroom = self._own_classroom(professor_id, classroom_id)
         _check(classroom_errors(name, weekly_goal))
         classroom.name = name.strip()
+        goal_changed = classroom.weekly_goal != weekly_goal
         classroom.weekly_goal = weekly_goal
+        if goal_changed:
+            # A lower target may already be reached by this week's solves.
+            self.goals.reward_goal_if_completed(classroom)
         self.session.commit()
         return self._classroom_view(classroom)
 

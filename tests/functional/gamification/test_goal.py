@@ -113,3 +113,28 @@ def test_FT_GAME_14_professor_target_cap_and_no_goal(professor: Account, new_stu
         join(bruno, classroom["join_code"])
         assert my_goal(bruno, classroom["id"]) is None
         assert professor_goal(professor, classroom["id"]) is None
+
+
+@pytest.mark.req("RF-19")
+def test_FT_GAME_18_lowering_the_target_rewards_this_weeks_contributors(
+    professor: Account, new_student
+):
+    turma = turma_with_mission(professor, ("pattern", "grouping", "filtering"), weekly_goal=3)
+    first = turma.challenges[0]
+    alice, bruno, carla = new_student(), new_student(), new_student()
+    for student in (alice, bruno, carla):
+        join(student, turma.join_code)
+    solve(alice, first)
+    solve(bruno, first)
+    assert "class_goal_1" not in earned(alice)
+
+    url = f"/api/professor/classrooms/{turma.id}"
+    body = {"name": turma.classroom["name"], "weekly_goal": 2}
+    response = professor.client.put(url, json=body)
+
+    assert response.status_code == 200, response.text
+    goal = response.json()["goal"]
+    assert (goal["target"], goal["progress"], goal["completed"]) == (2, 2, True)
+    assert "class_goal_1" in earned(alice)
+    assert "class_goal_1" in earned(bruno)
+    assert "class_goal_1" not in earned(carla)

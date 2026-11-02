@@ -33,6 +33,47 @@ HTTP_ERRORS: dict[int, tuple[str, str]] = {
     405: ("method_not_allowed", "Método não permitido."),
 }
 
+# PT-BR names of the request fields, for the 422 sentences of malformed requests.
+FIELD_LABELS: dict[str, str] = {
+    "username": "nome de usuário",
+    "password": "senha",
+    "new_password": "nova senha",
+    "recovery_code": "código de recuperação",
+    "answer": "resposta",
+    "title": "título",
+    "statement": "enunciado",
+    "type": "tipo",
+    "content": "conteúdo",
+    "explanation": "explicação",
+    "name": "nome",
+    "weekly_goal": "meta semanal",
+    "join_code": "código da turma",
+    "description": "descrição",
+    "position": "posição",
+    "challenge_ids": "desafios",
+    "mission_ids": "missões",
+    "mission_id": "missão",
+    "classroom_id": "turma",
+    "topic": "tema",
+    "profile_public": "perfil público",
+    "period": "período",
+    "scope": "escopo",
+}
+UNKNOWN_FIELD_LABEL = "um dos campos"
+
+
+def field_label(loc: tuple) -> str:
+    # Walk from the end: in ("body", "challenge_ids", 2) the field is before the list index.
+    for part in reversed(loc):
+        if isinstance(part, str) and part in FIELD_LABELS:
+            return FIELD_LABELS[part]
+    return UNKNOWN_FIELD_LABEL
+
+
+def field_errors(exc: RequestValidationError) -> list[str]:
+    sentences = (f"Campo obrigatório ou inválido: {field_label(e['loc'])}." for e in exc.errors())
+    return list(dict.fromkeys(sentences))
+
 
 def error_body(code: str, message: str) -> dict:
     return {"detail": code, "message": message}
@@ -51,9 +92,10 @@ async def handle_service_error(request: Request, exc: ServiceError) -> JSONRespo
 
 
 async def handle_request_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-    # Only a request the interface would never build gets here, so a plain message is enough;
-    # echoing the input back could also leak a password into the response.
-    return JSONResponse(error_body("validation_error", "Dados inválidos."), status_code=422)
+    # Only field names are reported: echoing the input back could leak a password.
+    body = error_body("validation_error", "Dados inválidos.")
+    body["errors"] = field_errors(exc)
+    return JSONResponse(body, status_code=422)
 
 
 async def handle_http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:

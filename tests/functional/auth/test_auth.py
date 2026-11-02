@@ -204,3 +204,11 @@ def test_FT_AUTH_09_error_responses_have_a_code_and_a_portuguese_message(
     assert_error(anonymous.post("/api/auth/register", json={"username": unique()}), 422)
     assert_error(anonymous.post("/api/auth/register", content=b"not json"), 422)
     assert_error(student.client.get("/api/rankings", params={"period": "year"}), 422)
+
+
+@pytest.mark.req("RNF-05")
+def test_FT_AUTH_17_a_malformed_request_names_each_wrong_field_in_portuguese(anonymous):
+    response = anonymous.post("/api/auth/register", json={"username": unique(), "password": 123})
+
+    body = assert_error(response, 422, "validation_error")
+    assert body["errors"] == ["Campo obrigatório ou inválido: senha."]

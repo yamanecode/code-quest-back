@@ -6,7 +6,9 @@ from sqlalchemy import func, select
 from app.api.deps import get_content_service
 from app.domain.enums import Role
 from app.infra.db.models import Classroom, XPEvent
+from app.services.classroom_service import ClassroomService
 from app.services.content_service import ContentService
+from app.services.gamification_service import GamificationService
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
     add_member,
@@ -17,6 +19,10 @@ from tests.integration.factories import (
 )
 
 URL = "/api/professor/classrooms"
+
+
+def goals(session, clock) -> ClassroomService:
+    return ClassroomService(session, clock, GamificationService(session, clock))
 
 
 @pytest.fixture
@@ -66,7 +72,7 @@ def test_T_PROF_02_join_code_collision_is_retried(client, session, clock, header
     taken = make_classroom(session)
     codes = iter([taken.join_code, "NEW001"])
     client.app.dependency_overrides[get_content_service] = lambda: ContentService(
-        session, clock, make_join_code=lambda: next(codes)
+        session, clock, goals(session, clock), make_join_code=lambda: next(codes)
     )
 
     response = client.post(URL, json={"name": "Turma"}, headers=headers)
@@ -77,7 +83,9 @@ def test_T_PROF_02_join_code_collision_is_retried(client, session, clock, header
 
 def test_T_PROF_02_gives_up_after_repeated_collisions(session, clock, teacher):
     taken = make_classroom(session)
-    service = ContentService(session, clock, make_join_code=lambda: taken.join_code)
+    service = ContentService(
+        session, clock, goals(session, clock), make_join_code=lambda: taken.join_code
+    )
 
     with pytest.raises(RuntimeError):
         service.create_classroom(teacher.id, "Turma", None)

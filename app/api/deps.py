@@ -52,12 +52,6 @@ def get_auth_service(
     return AuthService(session, clock, limiter)
 
 
-def get_content_service(
-    session: DbSession, clock: Annotated[Clock, Depends(get_clock)]
-) -> ContentService:
-    return ContentService(session, clock)
-
-
 def get_gamification_service(
     session: DbSession, clock: Annotated[Clock, Depends(get_clock)]
 ) -> GamificationService:
@@ -70,6 +64,14 @@ def get_classroom_service(
     gamification: Annotated[GamificationService, Depends(get_gamification_service)],
 ) -> ClassroomService:
     return ClassroomService(session, clock, gamification)
+
+
+def get_content_service(
+    session: DbSession,
+    clock: Annotated[Clock, Depends(get_clock)],
+    goals: Annotated[ClassroomService, Depends(get_classroom_service)],
+) -> ContentService:
+    return ContentService(session, clock, goals)
 
 
 def get_ai_service(

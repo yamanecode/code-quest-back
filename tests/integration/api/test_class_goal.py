@@ -202,3 +202,70 @@ def test_T_STU_GOAL_05_a_closed_turma_has_no_goal_and_gives_no_rewards(client, s
     assert (
         goal_of(client, clock, bia, turma)["progress"] == 1
     )  # the solve still counts once reopened
+
+
+def set_weekly_goal(client, clock, professor, turma, weekly_goal):
+    url = f"/api/professor/classrooms/{turma.id}"
+    body = {"name": "Turma", "weekly_goal": weekly_goal}
+    response = client.put(url, json=body, headers=bearer(professor, clock))
+    assert response.status_code == 200
+    return response.json()["goal"]
+
+
+def professor_turma_with(session, members, challenges, weekly_goal):
+    professor = make_user(session, "prof", role=Role.PROFESSOR)
+    turma = make_classroom(session, professor, weekly_goal=weekly_goal)
+    for member in members:
+        add_member(session, member, turma)
+    mission = make_mission(session, turma)
+    return (
+        professor,
+        turma,
+        [make_challenge(session, missions=(mission,)) for _ in range(challenges)],
+    )
+
+
+def test_T_STU_GOAL_09_lowering_the_target_rewards_the_contributors(client, session, clock):
+    ana, bia, caio = (make_user(session, name) for name in ("ana", "bia", "caio"))
+    professor, turma, (first, second, _) = professor_turma_with(
+        session, [ana, bia, caio], challenges=3, weekly_goal=5
+    )
+    solve(client, clock, ana, first)
+    solve(client, clock, bia, second)
+    assert rewards(session, turma) == []
+
+    goal = set_weekly_goal(client, clock, professor, turma, 2)
+
+    assert (goal["target"], goal["progress"], goal["completed"]) == (2, 2, True)
+    assert rewards(session, turma) == sorted([ana.id, bia.id])
+    assert earned(client, clock, ana, "class_goal_1")
+    assert earned(client, clock, bia, "class_goal_1")
+    assert not earned(client, clock, caio, "class_goal_1")
+
+
+def test_T_STU_GOAL_10_edits_reward_a_week_once_and_raising_rewards_nobody(client, session, clock):
+    ana, bia = make_user(session, "ana"), make_user(session, "bia")
+    professor, turma, (first, _) = professor_turma_with(
+        session, [ana, bia], challenges=2, weekly_goal=None
+    )
+    solve(client, clock, ana, first)
+
+    set_weekly_goal(client, clock, professor, turma, 3)  # raised: still 1 of 3
+    assert rewards(session, turma) == []
+    set_weekly_goal(client, clock, professor, turma, 1)
+    set_weekly_goal(client, clock, professor, turma, None)
+    set_weekly_goal(client, clock, professor, turma, 1)
+
+    assert rewards(session, turma) == [ana.id]
+
+
+def test_T_STU_GOAL_11_editing_a_closed_turma_rewards_nobody(client, session, clock):
+    ana = make_user(session, "ana")
+    professor, turma, (first, _) = professor_turma_with(session, [ana], challenges=2, weekly_goal=2)
+    solve(client, clock, ana, first)
+    turma.closed = True
+    session.flush()
+
+    assert set_weekly_goal(client, clock, professor, turma, 1) is None
+    assert rewards(session, turma) == []
+    assert not earned(client, clock, ana, "class_goal_1")

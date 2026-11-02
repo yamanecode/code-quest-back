@@ -267,7 +267,9 @@ class DemoService:
         gamification = GamificationService(self.session, clock)
         goals = ClassroomService(self.session, clock, gamification)
         cooldown = get_settings().HINT_COOLDOWN_SECONDS
-        ai = AIService(self.session, clock, self.llm, ContentService(self.session, clock), cooldown)
+        ai = AIService(
+            self.session, clock, self.llm, ContentService(self.session, clock, goals), cooldown
+        )
         play = PlayService(self.session, clock, gamification, goals, ai)
         auth = AuthService(self.session, clock)
 

@@ -100,13 +100,20 @@ class ClassroomService:
         for classroom in self.classrooms.goal_classrooms(user_id, challenge_id):
             # Members finishing together: the second waits here and then counts both solves.
             # Turmas come in id order, so two submits never wait for each other's locks.
-            lock_classroom(self.session, classroom.id)
-            goal = class_goal(self.classrooms, classroom, now)
-            if goal is None or not goal.completed:
-                continue
-            if self.classrooms.has_goal_rewards(classroom.id, goal.week_start):
-                continue
-            contributors = self.classrooms.goal_contributors(classroom.id, week_start(now))
-            self.classrooms.add_goal_rewards(classroom.id, goal.week_start, contributors, now)
-            for member_id in sorted(contributors - {user_id}):
-                self.gamification.award_new_badges(member_id)
+            self._reward_goal(classroom, now, submitter_id=user_id)
+
+    def reward_goal_if_completed(self, classroom: Classroom) -> None:
+        """Re-checks a goal whose target changed without a solve; the caller commits."""
+        self._reward_goal(classroom, self.clock.now(), submitter_id=None)
+
+    def _reward_goal(self, classroom: Classroom, now: datetime, submitter_id: int | None) -> None:
+        lock_classroom(self.session, classroom.id)
+        goal = class_goal(self.classrooms, classroom, now)
+        if goal is None or not goal.completed:
+            return
+        if self.classrooms.has_goal_rewards(classroom.id, goal.week_start):
+            return
+        contributors = self.classrooms.goal_contributors(classroom.id, week_start(now))
+        self.classrooms.add_goal_rewards(classroom.id, goal.week_start, contributors, now)
+        for member_id in sorted(contributors - {submitter_id}):
+            self.gamification.award_new_badges(member_id)

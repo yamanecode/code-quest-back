@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.domain import badges as domain_badges
@@ -35,7 +36,16 @@ class BadgeRepository:
         return {code: earned_at for code, earned_at in self.session.execute(query)}
 
     def award(self, user_id: int, codes: Iterable[str], created_at: datetime) -> None:
-        badges = self.session.scalars(select(Badge).where(Badge.code.in_(list(codes))))
-        for badge in badges:
-            self.session.add(UserBadge(user_id=user_id, badge_id=badge.id, created_at=created_at))
-        self.session.flush()
+        badge_ids = self.session.scalars(select(Badge.id).where(Badge.code.in_(list(codes))))
+        rows = [
+            {"user_id": user_id, "badge_id": badge_id, "created_at": created_at}
+            for badge_id in badge_ids
+        ]
+        if not rows:
+            return
+        # A goal reward can award a member's badge while that member's own submit does too;
+        # whichever commits second keeps the first row instead of failing.
+        statement = insert(UserBadge).values(rows)
+        self.session.execute(
+            statement.on_conflict_do_nothing(index_elements=["user_id", "badge_id"])
+        )

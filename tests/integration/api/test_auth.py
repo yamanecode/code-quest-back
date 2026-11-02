@@ -79,7 +79,11 @@ def test_T_AUTH_04_missing_fields_are_rejected(client):
     response = client.post("/api/auth/register", json={"username": "aluna"})
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "validation_error", "message": "Dados inválidos."}
+    assert response.json() == {
+        "detail": "validation_error",
+        "message": "Dados inválidos.",
+        "errors": ["Campo obrigatório ou inválido: senha."],
+    }
 
 
 def test_T_AUTH_05_login_returns_bearer_token(client):
