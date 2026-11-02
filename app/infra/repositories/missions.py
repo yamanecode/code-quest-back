@@ -1,12 +1,29 @@
 from collections.abc import Iterable
 
-from sqlalchemy import delete, exists, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import ColumnElement, and_, delete, exists, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.domain.enums import ContentStatus
 from app.infra.db.models import Challenge, ClassroomMember, Mission, MissionChallenge, Submission
 
 PUBLISHED = ContentStatus.PUBLISHED
+
+
+def student_visible() -> ColumnElement[bool]:
+    """Condition on Mission: published and holding at least one published challenge.
+
+    Every query that decides what students see or what counts for them uses it, so an
+    emptied mission disappears everywhere at once (spec 3).
+    """
+    link = aliased(MissionChallenge)
+    challenge = aliased(Challenge)
+    has_published_challenge = (
+        exists()
+        .where(link.mission_id == Mission.id)
+        .where(challenge.id == link.challenge_id)
+        .where(challenge.status == PUBLISHED)
+    )
+    return and_(Mission.status == PUBLISHED, has_published_challenge)
 
 
 class MissionRepository:
@@ -35,12 +52,21 @@ class MissionRepository:
     def get(self, mission_id: int) -> Mission | None:
         return self.session.get(Mission, mission_id)
 
-    def get_base_by_title(self, title: str) -> Mission | None:
-        query = select(Mission).where(Mission.classroom_id.is_(None), Mission.title == title)
-        return self.session.scalar(query)
+    def get_by_base_key(self, key: str) -> Mission | None:
+        return self.session.scalar(select(Mission).where(Mission.base_key == key))
+
+    def base_without_key(self) -> list[Mission]:
+        """Base missions stored before keys existed."""
+        query = select(Mission).where(Mission.classroom_id.is_(None), Mission.base_key.is_(None))
+        return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
 
     def list_for_classroom(self, classroom_id: int) -> list[Mission]:
         query = select(Mission).where(Mission.classroom_id == classroom_id)
+        return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
+
+    def visible_for_classroom(self, classroom_id: int) -> list[Mission]:
+        """The turma's missions that its students can see."""
+        query = select(Mission).where(Mission.classroom_id == classroom_id, student_visible())
         return list(self.session.scalars(query.order_by(Mission.position, Mission.id)))
 
     def delete(self, mission: Mission) -> None:
@@ -116,12 +142,12 @@ class MissionRepository:
             ClassroomMember.user_id == user_id
         )
         return select(Mission.id).where(
-            Mission.status == PUBLISHED,
+            student_visible(),
             or_(Mission.classroom_id.is_(None), Mission.classroom_id.in_(member_classrooms)),
         )
 
     def visible_mission_ids(self, user_id: int) -> set[int]:
-        """Published base missions plus published missions of the student's turmas."""
+        """Visible base missions plus visible missions of the student's turmas."""
         return set(self.session.scalars(self._visible_missions(user_id)))
 
     def visible_missions(self, user_id: int) -> list[Mission]:

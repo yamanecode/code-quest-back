@@ -178,3 +178,11 @@ def test_T_AI_PROMPT_06_elements_are_listed_by_text_without_their_stored_ids(cha
         for element in elements:
             assert f"- {element['text']}" in lines
             assert f"- {element['id']}: {element['text']}" not in lines
+
+
+def test_T_AI_PROMPT_07_pattern_schema_example_does_not_put_the_answer_first():
+    # Students see shuffled options, but a model that copies "a" would still place the
+    # answer first in every draft.
+    user = draft_prompt(ChallengeType.PATTERN, "Frutas", examples=[]).user
+    assert '"solution": "a"' not in user
+    assert '"solution": "c"' in user

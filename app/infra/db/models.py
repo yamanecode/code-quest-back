@@ -80,6 +80,7 @@ class ClassroomMember(_Row):
 
 class Mission(_Row):
     __tablename__ = "missions"
+    __table_args__ = (UniqueConstraint("base_key", name="uq_missions_base_key"),)
 
     classroom_id: Mapped[int | None] = mapped_column(ForeignKey("classrooms.id"))
     title: Mapped[str] = mapped_column(String(80))
@@ -90,10 +91,13 @@ class Mission(_Row):
     )
     # Set on the first publish only; drives the "Novo" label.
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Stable id of a base-game mission in content/base; null for turma missions.
+    base_key: Mapped[str | None] = mapped_column(String(80))
 
 
 class Challenge(_Row):
     __tablename__ = "challenges"
+    __table_args__ = (UniqueConstraint("base_key", name="uq_challenges_base_key"),)
 
     owner_id: Mapped[int] = _user_fk()
     title: Mapped[str] = mapped_column(String(80))
@@ -106,6 +110,7 @@ class Challenge(_Row):
     )
     origin: Mapped[Origin] = mapped_column(_enum(Origin, "challenge_origin"))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    base_key: Mapped[str | None] = mapped_column(String(80))
 
 
 class MissionChallenge(_Row):

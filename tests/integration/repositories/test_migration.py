@@ -61,6 +61,14 @@ def test_T_MIG_04_missions_and_challenges_have_published_at(engine: Engine):
         assert columns["published_at"]["nullable"]
 
 
+def test_T_MIG_06_missions_and_challenges_have_a_unique_optional_base_key(engine: Engine):
+    for table in ("missions", "challenges"):
+        columns = {column["name"]: column for column in inspect(engine).get_columns(table)}
+        assert columns["base_key"]["nullable"]
+        unique = inspect(engine).get_unique_constraints(table)
+        assert any(constraint["column_names"] == ["base_key"] for constraint in unique)
+
+
 def _alembic() -> Config:
     config = Config(str(ALEMBIC_INI))
     url = get_settings().TEST_DATABASE_URL

@@ -110,10 +110,10 @@ def test_T_BASE_02_cli_loads_the_base_game(session, capsys):
     assert cli.load_base(session, str(BASE_DIR)) == 0
 
     out = capsys.readouterr().out
-    assert "Missão criada: Trilha: Pensamento algorítmico" in out
+    assert "Criado: Trilha: Pensamento algorítmico" in out
     assert session.scalar(select(func.count()).select_from(Mission)) == 5
     assert cli.load_base(session, str(BASE_DIR)) == 0
-    assert "Missão já existente, mantida: Desafios mistos" in capsys.readouterr().out
+    assert "Mantido: Desafios mistos" in capsys.readouterr().out
 
 
 def test_T_BASE_04_cli_names_the_broken_file_and_exits_1(session, capsys, tmp_path):

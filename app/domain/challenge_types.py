@@ -303,48 +303,55 @@ def _structure(challenge_type: str, content: dict) -> tuple:
     solution = content.get("solution")
     if challenge_type == ChallengeType.FILTERING:
         solution = sorted(solution)
-    return ids, solution
+    # The sequence and the question decide what the right answer is, so answers given
+    # before an edit would no longer match the challenge.
+    return ids, solution, content.get("sequence"), content.get("question")
 
 
 def structure_changed(challenge_type: str, old_content: dict, new_content: dict) -> bool:
-    """True when ids, element counts or the solution differ; text changes are allowed."""
+    """True when ids, element counts, the solution, the sequence or the question differ."""
     return _structure(challenge_type, old_content) != _structure(challenge_type, new_content)
 
 
-# Types whose items students see shuffled and renamed (SG-08).
-SHUFFLED_TYPES = (ChallengeType.ORDERING, ChallengeType.GROUPING, ChallengeType.FILTERING)
+def edit_is_structural(old_type: str, old_content: dict, new_type: str, new_content: dict) -> bool:
+    """True when an edit is not allowed once the challenge has answers (spec 4.5)."""
+    return old_type != new_type or structure_changed(new_type, old_content, new_content)
 
 
-def _shuffled_ids(items: list[dict], solution: list[str] | None, seed: str) -> list[str]:
-    def sort_key(item_id: str) -> str:
-        return hashlib.sha256(f"{seed}:{item_id}".encode()).hexdigest()
+def _shuffled_ids(elements: list[dict], solution: list[str] | None, seed: str) -> list[str]:
+    def sort_key(element_id: str) -> str:
+        return hashlib.sha256(f"{seed}:{element_id}".encode()).hexdigest()
 
-    shuffled = sorted((item["id"] for item in items), key=sort_key)
+    shuffled = sorted((element["id"] for element in elements), key=sort_key)
     if shuffled == solution:
         shuffled = shuffled[1:] + shuffled[:1]
     return shuffled
 
 
-def student_ids(challenge_type: str, content: dict, seed: str) -> dict[str, str]:
-    """Stored item id -> the id this student sees, the letter of its displayed position.
+def _shuffled_key(challenge_type: ChallengeType) -> str:
+    return "options" if challenge_type == ChallengeType.PATTERN else "items"
 
-    Empty for types that are shown as stored. The order and the new ids depend only on
-    the seed, so neither reveals the solution.
+
+def student_ids(challenge_type: str, content: dict, seed: str) -> dict[str, str]:
+    """Stored id -> the id this student sees, the letter of its displayed position.
+
+    Items are shuffled for ordering, grouping and filtering, options for pattern. The order
+    and the new ids depend only on the seed, so neither reveals the solution.
     """
     challenge_type = ChallengeType(challenge_type)
-    if challenge_type not in SHUFFLED_TYPES:
-        return {}
     solution = content["solution"] if challenge_type == ChallengeType.ORDERING else None
-    order = _shuffled_ids(content["items"], solution, seed)
-    return {item_id: _letter_id(position) for position, item_id in enumerate(order)}
+    order = _shuffled_ids(content[_shuffled_key(challenge_type)], solution, seed)
+    return {element_id: _letter_id(position) for position, element_id in enumerate(order)}
 
 
 def to_student_view(challenge_type: str, content: dict, seed: str) -> dict:
-    """Content without the solution; items shuffled and renamed per student (SG-08)."""
+    """Content without the solution; items or options shuffled and renamed (SG-08)."""
     challenge_type = ChallengeType(challenge_type)
     view = copy.deepcopy({key: value for key, value in content.items() if key != "solution"})
-    ids = student_ids(challenge_type, content, seed)
-    if ids:
-        by_id = {item["id"]: item for item in view["items"]}
-        view["items"] = [by_id[stored] | {"id": shown} for stored, shown in ids.items()]
+    key = _shuffled_key(challenge_type)
+    by_id = {element["id"]: element for element in view[key]}
+    view[key] = [
+        by_id[stored] | {"id": shown}
+        for stored, shown in student_ids(challenge_type, content, seed).items()
+    ]
     return {"type": challenge_type, "skill": SKILL_LABELS[challenge_type], "content": view}

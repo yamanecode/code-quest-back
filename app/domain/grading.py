@@ -41,11 +41,13 @@ def answer_from_student(challenge_type: str, content: dict, seed: str, answer: o
         shown: stored for stored, shown in student_ids(challenge_type, content, seed).items()
     }
     key = ANSWER_KEYS[challenge_type]
-    if not stored_by_shown or not isinstance(answer, dict) or set(answer) != {key}:
+    if not isinstance(answer, dict) or set(answer) != {key}:
         return answer
     value = answer[key]
     if challenge_type == ChallengeType.GROUPING and isinstance(value, dict):
         return {key: {_stored_id(stored_by_shown, item): group for item, group in value.items()}}
+    if challenge_type == ChallengeType.PATTERN and isinstance(value, str):
+        return {key: _stored_id(stored_by_shown, value)}
     if challenge_type != ChallengeType.GROUPING and isinstance(value, list):
         return {key: [_stored_id(stored_by_shown, item) for item in value]}
     return answer

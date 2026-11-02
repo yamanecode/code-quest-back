@@ -82,10 +82,17 @@ def load_base(session: Session, directory: str) -> int:
     except ServiceError as error:
         _print_error(error)
         return 1
-    for title in report.created:
-        print(f"Missão criada: {title}")
-    for title in report.skipped:
-        print(f"Missão já existente, mantida: {title}")
+    lines = (
+        ("Chave associada pelo título", report.matched),
+        ("Sem arquivo correspondente, sem chave", report.unmatched),
+        ("Criado", report.created),
+        ("Atualizado", report.updated),
+        ("Mantido", report.kept),
+        ("Fora dos arquivos, mantido na missão", report.not_in_files),
+    )
+    for prefix, names in lines:
+        for name in names:
+            print(f"{prefix}: {name}")
     return 0
 
 

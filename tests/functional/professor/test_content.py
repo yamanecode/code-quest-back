@@ -12,6 +12,7 @@ from tests.functional.helpers import (
     create_challenge,
     fail,
     join,
+    my_goal,
     new_classroom,
     new_mission,
     turma_with_mission,
@@ -245,6 +246,42 @@ def test_FT_PROF_04_mission_without_a_published_challenge_cannot_be_published(
     assert response.json()["status"] == "published"
 
 
+@pytest.mark.req("RF-04")
+def test_FT_PROF_13_mission_whose_only_challenge_is_unpublished_disappears_for_students(
+    professor: Account, student: Account
+):
+    turma = turma_with_mission(professor, ("ordering",))
+    mission_id, challenge_id = turma.mission["id"], turma.challenges[0]["id"]
+    join(student, turma.join_code)
+
+    def turma_missions() -> list[dict]:
+        classrooms = student.client.get("/api/missions").json()["classrooms"]
+        return next(c["missions"] for c in classrooms if c["id"] == turma.id)
+
+    def professor_mission() -> dict:
+        return professor.client.get(f"/api/professor/missions/{mission_id}").json()
+
+    assert [m["id"] for m in turma_missions()] == [mission_id]
+    assert my_goal(student, turma.id) is not None
+    assert professor_mission()["has_published_challenge"] is True
+
+    unpublish = professor.client.post(f"/api/professor/challenges/{challenge_id}/unpublish")
+    assert unpublish.status_code == 200, unpublish.text
+
+    assert turma_missions() == []
+    assert student.client.get(f"/api/missions/{mission_id}").status_code == 404
+    card = student.client.get("/api/me/continue")
+    assert card.status_code == 204 or card.json()["mission_id"] != mission_id
+    assert my_goal(student, turma.id) is None
+    mission = professor_mission()
+    assert (mission["status"], mission["has_published_challenge"]) == ("published", False)
+
+    publish = professor.client.post(f"/api/professor/challenges/{challenge_id}/publish")
+    assert publish.status_code == 200, publish.text
+    assert [m["id"] for m in turma_missions()] == [mission_id]
+    assert student.client.get("/api/me/continue").json()["mission_id"] == mission_id
+
+
 @pytest.mark.req("RF-22")
 def test_FT_PROF_05_structure_is_locked_once_students_answered(
     professor: Account, student: Account
@@ -279,6 +316,30 @@ def test_FT_PROF_05_structure_is_locked_once_students_answered(
     for payload in (new_type, more_items, new_solution, renamed_id):
         assert_error(update(professor, challenge["id"], payload), 409, "challenge_locked")
     assert payload_of(get_challenge(professor, challenge["id"])) == text_edit
+
+
+@pytest.mark.req("RF-22")
+@pytest.mark.parametrize(
+    ("challenge_type", "field", "value"),
+    [
+        ("pattern", "sequence", ["3", "6", "12", "24"]),
+        ("filtering", "question", "Qual informação muda a resposta agora?"),
+    ],
+)
+def test_FT_PROF_12_sequence_and_question_are_locked_once_students_answered(
+    professor: Account, student: Account, challenge_type: str, field: str, value: object
+):
+    turma = turma_with_mission(professor, (challenge_type,))
+    challenge = turma.challenges[0]
+    join(student, turma.join_code)
+    fail(student, challenge)
+
+    changed = payload_of(challenge)
+    changed["content"][field] = value
+    response = update(professor, challenge["id"], changed)
+
+    assert_error(response, 409, "challenge_locked")
+    assert get_challenge(professor, challenge["id"])["content"] == challenge["content"]
 
 
 @pytest.mark.req("RF-22")

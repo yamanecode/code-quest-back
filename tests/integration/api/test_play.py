@@ -89,6 +89,7 @@ def test_T_STU_01_sees_base_and_member_turma_missions_grouped(client, session, s
     solved = make_challenge(session, missions=(base,))
     make_challenge(session, missions=(base,))
     make_challenge(session, status=DRAFT, missions=(base,))
+    make_challenge(session, missions=(turma_mission,))
     first_solve(session, student, solved)
 
     response = client.get("/api/missions", headers=headers)
@@ -97,7 +98,7 @@ def test_T_STU_01_sees_base_and_member_turma_missions_grouped(client, session, s
     assert response.json() == {
         "base": [summary(base, total=2, solved=1)],
         "classrooms": [
-            {"id": mine.id, "name": mine.name, "missions": [summary(turma_mission, 0, 0)]},
+            {"id": mine.id, "name": mine.name, "missions": [summary(turma_mission, 1, 0)]},
             {"id": empty.id, "name": empty.name, "missions": []},
         ],
     }
@@ -154,16 +155,16 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
     last = challenges[-1]
     view = client.get(f"/api/challenges/{last.id}", headers=headers)
     assert view.status_code == 200
-    assert view.json() == {
+    body = view.json()
+    options = body.pop("content").pop("options")
+    assert [option["id"] for option in options] == list("abcd")
+    assert sorted(o["text"] for o in options) == sorted(o["text"] for o in last.content["options"])
+    assert body == {
         "id": last.id,
         "title": last.title,
         "statement": last.statement,
         "type": "pattern",
         "skill": "Reconhecimento de padrões",
-        "content": {
-            "sequence": ["2", "4", "8"],
-            "options": last.content["options"],
-        },
         "solved": False,
         "is_new": False,
         "explanation": None,
@@ -244,6 +245,33 @@ def test_T_STU_VIEW_01_students_see_their_own_order_of_the_items(client, session
         assert again == content
 
     assert len(orders) > 1
+
+
+def test_T_STU_CHAL_PATTERN_01_pattern_options_are_shuffled_per_student(client, session, clock):
+    challenge = make_challenge(
+        session, challenge_type=ChallengeType.PATTERN, missions=(make_mission(session),)
+    )
+    texts = {option["id"]: option["text"] for option in challenge.content["options"]}
+    answer_text = texts[challenge.content["solution"]]
+
+    orders = set()
+    for name in ("ana", "bia", "caio", "davi", "edu", "fabi"):
+        headers = bearer(make_user(session, name), clock)
+        content = client.get(f"/api/challenges/{challenge.id}", headers=headers).json()["content"]
+        assert content["sequence"] == challenge.content["sequence"]
+        assert [option["id"] for option in content["options"]] == list("abcd")
+        orders.add(tuple(option["text"] for option in content["options"]))
+        shown = next(o["id"] for o in content["options"] if o["text"] == answer_text)
+        response = client.post(
+            f"/api/challenges/{challenge.id}/submissions",
+            json={"answer": {"option": shown}},
+            headers=headers,
+        )
+        assert response.json()["is_correct"] is True
+
+    assert len(orders) > 1
+    stored = session.scalars(select(Submission.answer)).all()
+    assert stored == [{"option": challenge.content["solution"]}] * 6
 
 
 def test_T_STU_VIEW_02_an_id_the_student_was_not_shown_is_rejected(

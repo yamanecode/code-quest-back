@@ -94,6 +94,8 @@ def to_shown(challenge_type: str, content: dict, seed: str, answer: dict) -> dic
     """The stored-id answer rewritten with the ids this student sees."""
     ids = student_ids(challenge_type, content, seed)
     key, value = next(iter(answer.items()))
+    if isinstance(value, str):
+        return {key: ids[value]}
     if isinstance(value, dict):
         return {key: {ids[item]: group for item, group in value.items()}}
     return {key: [ids[item] for item in value]}
@@ -105,6 +107,7 @@ def to_shown(challenge_type: str, content: dict, seed: str, answer: dict) -> dic
         (ChallengeType.ORDERING, ORDERING, {"order": ["c", "a", "b"]}),
         (ChallengeType.GROUPING, GROUPING, {"assignment": {"a": "g1", "b": "g2"}}),
         (ChallengeType.FILTERING, FILTERING, {"selected": ["a", "c"]}),
+        (ChallengeType.PATTERN, PATTERN, {"option": "a"}),
     ],
 )
 def test_T_DOM_GRADE_03_student_ids_are_mapped_back_before_grading(
@@ -126,6 +129,7 @@ def test_T_DOM_GRADE_03_student_ids_are_mapped_back_before_grading(
         (ChallengeType.GROUPING, GROUPING, {"assignment": {"a": "g1", "z": "g2"}}),
         (ChallengeType.FILTERING, FILTERING, {"selected": ["z"]}),
         (ChallengeType.FILTERING, FILTERING, {"selected": [None]}),
+        (ChallengeType.PATTERN, PATTERN, {"option": "z"}),
     ],
 )
 def test_T_DOM_GRADE_04_an_id_the_student_was_not_shown_is_malformed(
@@ -143,11 +147,10 @@ def test_T_DOM_GRADE_04_an_id_the_student_was_not_shown_is_malformed(
         (ChallengeType.ORDERING, ORDERING, {"order": ["a"], "extra": 1}),
         (ChallengeType.GROUPING, GROUPING, {"assignment": ["g1"]}),
         (ChallengeType.FILTERING, FILTERING, {"option": "a"}),
-        (ChallengeType.PATTERN, PATTERN, {"option": "a"}),
-        (ChallengeType.PATTERN, PATTERN, {"option": "z"}),
+        (ChallengeType.PATTERN, PATTERN, {"option": 3}),
+        (ChallengeType.PATTERN, PATTERN, {"option": ["a"]}),
+        (ChallengeType.PATTERN, PATTERN, {"selected": ["a"]}),
     ],
 )
-def test_T_DOM_GRADE_05_wrong_shapes_and_pattern_answers_pass_through_unchanged(
-    challenge_type, content, answer
-):
+def test_T_DOM_GRADE_05_wrong_shapes_pass_through_unchanged(challenge_type, content, answer):
     assert answer_from_student(challenge_type, content, "1:1", answer) == answer

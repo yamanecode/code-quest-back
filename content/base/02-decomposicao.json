@@ -1,9 +1,11 @@
 {
+  "key": "base-decomposicao",
   "title": "Trilha: Decomposição",
   "position": 2,
   "description": "Decompor é dividir um problema grande em partes menores. Engenheiros fazem isso para construir pontes; você faz isso para organizar uma festa.",
   "challenges": [
     {
+      "key": "base-decomposicao-01",
       "title": "Campeonato da escola",
       "statement": "O grêmio vai organizar um campeonato de futsal entre as turmas. Para ninguém se perder, o trabalho foi dividido em quatro frentes, cada uma com um responsável: inscrições, tabela e regras, dia dos jogos e encerramento. Indique a que frente pertence cada tarefa.",
       "type": "grouping",
@@ -79,6 +81,7 @@
       "explanation": "Dividir o campeonato em frentes permite que cada responsável cuide de uma lista menor e mostra rapidamente o que ainda falta. Quem sorteia os grupos não precisa saber como entregar medalhas."
     },
     {
+      "key": "base-decomposicao-02",
       "title": "Podcast da turma",
       "statement": "Sua turma vai lançar um episódio de podcast com uma entrevista. O projeto foi dividido em quatro partes, e cada dupla ficará com uma: roteiro, gravação, edição e divulgação. Indique em que parte entra cada tarefa.",
       "type": "grouping",
@@ -149,6 +152,7 @@
       "explanation": "Cada parte tem um resultado claro: o roteiro produz as perguntas, a gravação produz o áudio bruto, a edição produz o episódio final e a divulgação leva o episódio às pessoas. Assim as duplas trabalham sem depender umas das outras o tempo todo."
     },
     {
+      "key": "base-decomposicao-03",
       "title": "Aplicativo de delivery",
       "statement": "Uma equipe vai criar um aplicativo de pedidos de comida. Antes de programar qualquer coisa, ela dividiu o aplicativo em quatro módulos: cadastro, cardápio, pagamento e entrega. Indique a que módulo pertence cada função.",
       "type": "grouping",
@@ -219,6 +223,7 @@
       "explanation": "Sistemas grandes são construídos assim: divididos em módulos menores, cada um com uma responsabilidade. Se o pagamento falhar, a equipe sabe exatamente em que parte procurar o problema."
     },
     {
+      "key": "base-decomposicao-04",
       "title": "Viagem de formatura",
       "statement": "A comissão de formatura vai organizar uma viagem de três dias. Para dividir o trabalho, criou quatro grupos: transporte, hospedagem, alimentação e passeios. Indique a que grupo cabe cada tarefa.",
       "type": "grouping",
@@ -289,6 +294,7 @@
       "explanation": "Um problema como \"organizar a viagem\" é grande demais para resolver de uma vez. Separado em quatro partes, cada grupo sabe o que é seu, e a viagem fica pronta quando todas as partes ficam prontas."
     },
     {
+      "key": "base-decomposicao-05",
       "title": "A internet caiu",
       "statement": "A internet da sua casa parou de funcionar. Um técnico ensina a investigar o problema por partes: primeiro o seu aparelho, depois o roteador e, por fim, a operadora. Assim, você não liga para o suporte por um problema que estava no celular. Indique a que parte pertence cada verificação.",
       "type": "grouping",
@@ -350,6 +356,7 @@
       "explanation": "Decompor um defeito em partes permite testar uma de cada vez e eliminar suspeitos. Técnicos de informática usam exatamente essa estratégia para encontrar a causa de um problema."
     },
     {
+      "key": "base-decomposicao-06",
       "title": "Horta comunitária",
       "statement": "Os moradores de um bairro vão transformar um terreno vazio em uma horta comunitária. A associação dividiu o projeto em quatro fases: planejamento, preparo do terreno, plantio e cuidados. Indique em que fase entra cada tarefa.",
       "type": "grouping",

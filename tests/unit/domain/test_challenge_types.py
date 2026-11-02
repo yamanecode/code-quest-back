@@ -7,6 +7,7 @@ from app.domain.challenge_types import (
     SKILL_LABELS,
     ChallengeType,
     assign_item_ids,
+    edit_is_structural,
     structure_changed,
     student_ids,
     template_rules,
@@ -306,10 +307,6 @@ def test_T_DOM_EDIT_01_text_only_edits_keep_the_structure():
         for key in ("items", "groups", "options"):
             for element in edited.get(key, []):
                 element["text"] += " (novo)"
-        if "question" in edited:
-            edited["question"] = "Outra pergunta?"
-        if "sequence" in edited:
-            edited["sequence"] = ["3", "6", "9", "12"]
         assert not structure_changed(challenge_type, content, edited)
 
 
@@ -345,6 +342,31 @@ def test_T_DOM_EDIT_04_changing_the_solution_changes_the_structure():
     edited = copy.deepcopy(content)
     edited["solution"] = ["a", "b"]
     assert structure_changed(ChallengeType.FILTERING, content, edited)
+
+
+def test_T_DOM_EDIT_05_changing_the_pattern_sequence_changes_the_structure():
+    content = pattern()
+    edited = copy.deepcopy(content)
+    edited["sequence"] = ["3", "6", "9"]
+    assert structure_changed(ChallengeType.PATTERN, content, edited)
+
+
+def test_T_DOM_EDIT_06_changing_the_filtering_question_changes_the_structure():
+    content = filtering()
+    edited = copy.deepcopy(content)
+    edited["question"] = "Outra pergunta qualquer?"
+    assert structure_changed(ChallengeType.FILTERING, content, edited)
+
+
+def test_T_DOM_EDIT_07_edit_is_structural_when_the_type_or_the_structure_changes():
+    content = ordering()
+    texts_only = copy.deepcopy(content)
+    texts_only["items"][0]["text"] = "Outro texto"
+    assert not edit_is_structural("ordering", content, "ordering", texts_only)
+    assert edit_is_structural("ordering", content, "filtering", filtering())
+    reordered = copy.deepcopy(content)
+    reordered["solution"] = list(reversed(content["solution"]))
+    assert edit_is_structural("ordering", content, "ordering", reordered)
 
 
 def test_T_DOM_VIEW_01_student_view_has_skill_and_no_solution():
@@ -421,14 +443,40 @@ def test_T_DOM_VIEW_04_grouping_and_filtering_items_are_relabelled_by_position()
         assert content == original
 
 
-def test_T_DOM_VIEW_04_pattern_keeps_the_stored_options_and_input_is_not_mutated():
-    content = pattern()
+def test_T_DOM_VIEW_07_pattern_options_are_shuffled_and_relabelled_per_student():
+    content = pattern(option_count=5)
     original = copy.deepcopy(content)
-    view = to_student_view(ChallengeType.PATTERN, content, "1:2")
-    assert view["content"] == {"sequence": content["sequence"], "options": content["options"]}
-    assert student_ids(ChallengeType.PATTERN, content, "1:2") == {}
+    texts = {option["id"]: option["text"] for option in content["options"]}
+    orders = set()
+    for user_id in range(50):
+        seed = f"4:{user_id}"
+        view = to_student_view(ChallengeType.PATTERN, content, seed)["content"]
+        assert view["sequence"] == content["sequence"]
+        assert [option["id"] for option in view["options"]] == ["a", "b", "c", "d", "e"]
+        assert sorted(option["text"] for option in view["options"]) == sorted(texts.values())
+        ids = student_ids(ChallengeType.PATTERN, content, seed)
+        assert {option["text"]: option["id"] for option in view["options"]} == {
+            texts[stored]: shown for stored, shown in ids.items()
+        }
+        orders.add(tuple(option["text"] for option in view["options"]))
+        view["options"][0]["text"] = "changed"
+    assert to_student_view(ChallengeType.PATTERN, content, "4:1") == to_student_view(
+        ChallengeType.PATTERN, content, "4:1"
+    )
+    assert len(orders) > 1
     assert content == original
 
+
+def test_T_DOM_VIEW_07_pattern_solution_is_not_always_the_same_shown_option():
+    content = pattern()
+    shown_solutions = {
+        student_ids(ChallengeType.PATTERN, content, f"8:{user_id}")[content["solution"]]
+        for user_id in range(50)
+    }
+    assert len(shown_solutions) > 1
+
+
+def test_T_DOM_VIEW_04_ordering_input_is_not_mutated():
     content = ordering()
     original = copy.deepcopy(content)
     to_student_view(ChallengeType.ORDERING, content, "1:2")

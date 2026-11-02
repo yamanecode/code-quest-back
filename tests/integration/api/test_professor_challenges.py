@@ -250,6 +250,34 @@ def test_T_PROF_EDIT_02_type_change_after_a_submission_is_locked(client, session
     assert response.json() == LOCKED
 
 
+def _new_sequence(content):
+    content["sequence"] = ["3", "6", "12"]
+
+
+def _new_question(content):
+    content["question"] = "Qual informação muda a resposta?"
+
+
+@pytest.mark.parametrize(
+    ("challenge_type", "change"),
+    [("pattern", _new_sequence), ("filtering", _new_question)],
+)
+def test_T_PROF_EDIT_06_sequence_and_question_are_locked_after_a_submission(
+    client, session, headers, challenge_type, change
+):
+    created = create(client, headers, challenge_type=challenge_type).json()
+    answered(session, created["id"])
+    edited = challenge_body(challenge_type)
+    change(edited["content"])
+
+    response = client.put(f"{URL}/{created['id']}", json=edited, headers=headers)
+
+    assert response.status_code == 409
+    assert response.json() == LOCKED
+    session.expire_all()
+    assert session.get(Challenge, created["id"]).content == CONTENT[ChallengeType(challenge_type)]
+
+
 def test_T_PROF_EDIT_03_any_change_allowed_before_submissions(client, headers):
     created = create(client, headers).json()
     edited = challenge_body("pattern", title="Agora é padrão")

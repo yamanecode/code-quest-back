@@ -381,6 +381,35 @@ def test_FT_STU_13_item_ids_and_order_do_not_give_the_answer_away(new_student):
     assert orders_differ
 
 
+@pytest.mark.req("SG-08")
+def test_FT_STU_16_pattern_options_differ_between_students_and_hide_the_answer(new_student):
+    first, second = new_student(), new_student()
+    orders_differ = False
+    answer_letters = set()
+
+    for mission in missions(first)["base"]:
+        for summary in mission_detail(first, mission["id"])["challenges"]:
+            if summary["type"] != "pattern":
+                continue
+            path = f"/api/challenges/{summary['id']}"
+            views = [student.client.get(path).json() for student in (first, second)]
+            source = base_challenge(views[0]["title"], views[0]["statement"])
+            stored = {o["id"]: o["text"] for o in source["content"]["options"]}
+            answer_text = stored[source["content"]["solution"]]
+            texts = []
+            for view in views:
+                options = view["content"]["options"]
+                ids = [option["id"] for option in options]
+                assert ids == [chr(ord("a") + i) for i in range(len(ids))], view["title"]
+                assert sorted(o["text"] for o in options) == sorted(stored.values())
+                texts.append([option["text"] for option in options])
+                answer_letters.add(next(o["id"] for o in options if o["text"] == answer_text))
+            orders_differ = orders_differ or texts[0] != texts[1]
+
+    assert orders_differ
+    assert len(answer_letters) > 1
+
+
 @pytest.mark.req("RNF-06")
 def test_FT_STU_15_parallel_correct_answers_give_xp_once_and_no_server_error(
     professor: Account, student: Account

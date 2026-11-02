@@ -61,6 +61,7 @@ class MissionOut(BaseModel):
     description: str | None
     position: int
     status: str
+    has_published_challenge: bool
     challenges: list[ChallengeRefOut]
 
 

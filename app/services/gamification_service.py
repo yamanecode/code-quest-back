@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import Clock
 from app.domain.badges import BADGES, Badge, BadgeStats, badge_codes_earned, badge_display
 from app.domain.challenge_types import ChallengeType
-from app.domain.enums import ContentStatus, Role
+from app.domain.enums import Role
 from app.domain.gamification import (
     TITLE_STEPS,
     RankedRow,
@@ -257,13 +257,8 @@ class GamificationService:
     def classroom_progress(self, professor_id: int, classroom_id: int) -> ClassroomProgress:
         own_classroom(self.classrooms, professor_id, classroom_id)
         xp_in_class = {row.user_id: row.xp for row in self.xp.xp_in_classroom_total(classroom_id)}
-        published = [
-            mission.id
-            for mission in self.missions.list_for_classroom(classroom_id)
-            if mission.status == ContentStatus.PUBLISHED
-        ]
-        by_mission = self.missions.published_challenge_ids_by_mission(published)
-        missions = [ids for ids in by_mission.values() if ids]
+        visible = [mission.id for mission in self.missions.visible_for_classroom(classroom_id)]
+        missions = list(self.missions.published_challenge_ids_by_mission(visible).values())
         class_challenges = self.classrooms.goal_challenge_ids(classroom_id)
 
         students = []

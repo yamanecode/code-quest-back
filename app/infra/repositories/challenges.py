@@ -49,6 +49,9 @@ class ChallengeRepository:
     def get(self, challenge_id: int) -> Challenge | None:
         return self.session.get(Challenge, challenge_id)
 
+    def get_by_base_key(self, key: str) -> Challenge | None:
+        return self.session.scalar(select(Challenge).where(Challenge.base_key == key))
+
     def get_many(self, challenge_ids: Iterable[int]) -> dict[int, Challenge]:
         query = select(Challenge).where(Challenge.id.in_(list(challenge_ids)))
         return {challenge.id: challenge for challenge in self.session.scalars(query)}

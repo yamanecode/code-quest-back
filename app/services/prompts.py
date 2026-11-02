@@ -110,8 +110,12 @@ _DRAFT_SHAPES = {
     },
     ChallengeType.PATTERN: {
         "sequence": ["...", "...", "..."],
-        "options": [{"id": "a", "text": "..."}, {"id": "b", "text": "..."}],
-        "solution": "a",
+        "options": [
+            {"id": "a", "text": "..."},
+            {"id": "b", "text": "..."},
+            {"id": "c", "text": "..."},
+        ],
+        "solution": "c",
     },
 }
 

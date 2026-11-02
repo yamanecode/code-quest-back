@@ -15,6 +15,7 @@ from app.infra.db.models import (
     User,
     XPEvent,
 )
+from app.infra.repositories.missions import student_visible
 
 PUBLISHED = ContentStatus.PUBLISHED
 
@@ -94,7 +95,7 @@ class ClassroomRepository:
         return self.session.scalar(query) or 0
 
     # Class goal (RF-19): first solves of current members on the turma's
-    # published challenges inside published missions.
+    # published challenges inside missions students can see.
 
     def _members(self, classroom_id: int):
         return select(ClassroomMember.user_id).where(ClassroomMember.classroom_id == classroom_id)
@@ -106,7 +107,7 @@ class ClassroomRepository:
             .join(Challenge, Challenge.id == MissionChallenge.challenge_id)
             .where(
                 Mission.classroom_id == classroom_id,
-                Mission.status == PUBLISHED,
+                student_visible(),
                 Challenge.status == PUBLISHED,
             )
         )
@@ -128,7 +129,7 @@ class ClassroomRepository:
             .join(Challenge, Challenge.id == MissionChallenge.challenge_id)
             .where(
                 MissionChallenge.challenge_id == challenge_id,
-                Mission.status == PUBLISHED,
+                student_visible(),
                 Challenge.status == PUBLISHED,
             )
         )

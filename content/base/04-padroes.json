@@ -1,9 +1,11 @@
 {
+  "key": "base-padroes",
   "title": "Trilha: Reconhecimento de padrões",
   "position": 4,
   "description": "Reconhecer padrões é descobrir a regra que se repete. É o que a previsão do tempo, os corretores de texto e você fazem ao completar uma sequência.",
   "challenges": [
     {
+      "key": "base-padroes-01",
       "title": "Cadeiras do auditório",
       "statement": "No auditório da escola, a primeira fila tem 2 cadeiras e cada fila seguinte tem sempre o mesmo número de cadeiras a mais que a anterior. As quatro primeiras filas estão abaixo. Quantas cadeiras tem a quinta fila?",
       "type": "pattern",
@@ -41,6 +43,7 @@
       "explanation": "Cada fila tem 3 cadeiras a mais que a anterior: 2, 5, 8, 11, 14. O 22 seria o resultado de dobrar o último número, mas a regra aqui é somar, não multiplicar."
     },
     {
+      "key": "base-padroes-02",
       "title": "Pinos de boliche",
       "statement": "Em um jogo, pinos são arrumados em triângulo: a primeira fileira tem 1 pino, a segunda acrescenta 2, a terceira acrescenta 3, e assim por diante. A sequência mostra o total de pinos em triângulos cada vez maiores. Qual é o próximo total?",
       "type": "pattern",
@@ -79,6 +82,7 @@
       "explanation": "A diferença entre os termos cresce de 1 em 1: +2, +3, +4, +5 e agora +6, então 15 + 6 = 21. Quando a diferença muda, vale olhar a sequência das diferenças."
     },
     {
+      "key": "base-padroes-03",
       "title": "Corrente de mensagens",
       "statement": "Uma mensagem foi enviada para 1 pessoa. A cada hora, cada pessoa que recebeu a mensagem na hora anterior a repassa para 3 novas pessoas. A sequência mostra quantas pessoas novas receberam a mensagem em cada hora. Quantas recebem na hora seguinte?",
       "type": "pattern",
@@ -116,6 +120,7 @@
       "explanation": "Cada termo é o anterior vezes 3: 27 × 3 = 81. O crescimento por multiplicação é rápido: em poucas horas, milhares de pessoas recebem a mensagem. É assim que boatos se espalham."
     },
     {
+      "key": "base-padroes-04",
       "title": "Duas sequências em uma",
       "statement": "Um painel alterna números de duas contagens diferentes: uma sobe e outra desce, revezando a cada posição. Descubra as duas regras e indique qual número aparece em seguida.",
       "type": "pattern",
@@ -155,6 +160,7 @@
       "explanation": "As posições ímpares formam 2, 4, 6 (sobem de 2 em 2) e as pares formam 20, 18, 16 (descem de 2 em 2). O próximo é a 7ª posição, da contagem que sobe: 8. Separar um problema em partes ajuda a ver o padrão."
     },
     {
+      "key": "base-padroes-05",
       "title": "Letras que saltam",
       "statement": "Uma senha foi criada com letras que pulam no alfabeto, e cada salto é um pouco maior que o anterior. Depois do A vem o C (pula uma letra), depois o F (pula duas), e assim por diante. Qual é a próxima letra?",
       "type": "pattern",
@@ -193,6 +199,7 @@
       "explanation": "Os saltos são +2, +3, +4, +5 e agora +6: do O, contando seis letras (P, Q, R, S, T, U), chega-se ao U. O padrão não está nas letras, mas no tamanho dos saltos."
     },
     {
+      "key": "base-padroes-06",
       "title": "Casais de coelhos",
       "statement": "Em um problema famoso, cada número de uma sequência é obtido a partir dos dois números anteriores a ele. Os primeiros termos estão abaixo. Descubra a regra e indique o próximo termo.",
       "type": "pattern",

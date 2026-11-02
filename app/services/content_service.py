@@ -11,7 +11,7 @@ from app.domain.challenge_types import (
     ChallengeDraft,
     ChallengeType,
     challenge_errors,
-    structure_changed,
+    edit_is_structural,
 )
 from app.domain.content import (
     JOIN_CODE_ALPHABET,
@@ -62,6 +62,7 @@ class MissionView:
     description: str | None
     position: int
     status: str
+    has_published_challenge: bool
     challenges: list[ChallengeRef]
 
 
@@ -110,7 +111,7 @@ def add_published_mission(
     draft: MissionDraft,
     origin: Origin,
     classroom_id: int | None = None,
-) -> None:
+) -> tuple[Mission, list[Challenge]]:
     """Store a mission and its challenges, all published, in the given order (seed and base)."""
     missions = MissionRepository(session)
     challenges = ChallengeRepository(session)
@@ -135,6 +136,7 @@ def add_published_mission(
         for challenge in draft.challenges
     ]
     missions.set_challenges(mission.id, [row.id for row in rows])
+    return mission, rows
 
 
 def _challenge_not_found() -> NotFound:
@@ -332,6 +334,7 @@ class ContentService:
             description=mission.description,
             position=mission.position,
             status=mission.status,
+            has_published_challenge=any(c.status == ContentStatus.PUBLISHED for c in challenges),
             challenges=[ChallengeRef(c.id, c.title, c.type, c.status) for c in challenges],
         )
 
@@ -379,9 +382,8 @@ class ContentService:
         challenge = self._own_challenge(professor_id, challenge_id)
         # Rules first: structure_changed expects well-formed content.
         _check(challenge_errors(draft))
-        if self.challenges.has_submissions(challenge_id) and (
-            draft.type != challenge.type
-            or structure_changed(draft.type, challenge.content, draft.content)
+        if self.challenges.has_submissions(challenge_id) and edit_is_structural(
+            challenge.type, challenge.content, draft.type, draft.content
         ):
             raise Conflict(
                 "challenge_locked",

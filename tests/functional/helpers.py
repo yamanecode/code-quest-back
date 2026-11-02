@@ -311,23 +311,31 @@ def submit(student: Account, challenge_id: int, answer: dict) -> httpx.Response:
     )
 
 
-ANSWER_KEYS = {"ordering": "order", "grouping": "assignment", "filtering": "selected"}
+ANSWER_KEYS = {
+    "ordering": "order",
+    "grouping": "assignment",
+    "filtering": "selected",
+    "pattern": "option",
+}
 
 
 def as_student(student: Account, challenge: dict, answer: dict) -> dict:
-    """An answer written with the professor's item ids, rewritten with the ids this student sees.
+    """An answer written with the professor's ids, rewritten with the ids this student sees.
 
-    Items are matched by their (unique) text in the student's challenge view, like a real
-    client does. Answers of other types are returned unchanged.
+    Items (pattern: options) are matched by their unique text in the student's challenge
+    view, like a real client does. Answers with an unexpected shape are returned unchanged.
     """
     key = ANSWER_KEYS.get(challenge["type"])
     if key is None or set(answer) != {key}:
         return answer
     view = student.client.get(f"/api/challenges/{challenge['id']}")
     assert view.status_code == 200, view.text
-    shown_by_text = {item["text"]: item["id"] for item in view.json()["content"]["items"]}
-    shown = {item["id"]: shown_by_text[item["text"]] for item in challenge["content"]["items"]}
+    elements = "options" if challenge["type"] == "pattern" else "items"
+    shown_by_text = {e["text"]: e["id"] for e in view.json()["content"][elements]}
+    shown = {e["id"]: shown_by_text[e["text"]] for e in challenge["content"][elements]}
     value = answer[key]
+    if isinstance(value, str):
+        return {key: shown.get(value, value)}
     if isinstance(value, dict):
         return {key: {shown[item]: group for item, group in value.items()}}
     return {key: [shown[item] for item in value]}
