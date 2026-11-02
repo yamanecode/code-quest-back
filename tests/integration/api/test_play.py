@@ -168,6 +168,7 @@ def test_T_STU_03_mission_detail_in_order_and_any_challenge_opens(
         "is_new": False,
         "explanation": None,
         "cooldown_seconds_left": 0,
+        "hints_shown": [],
     }
 
 

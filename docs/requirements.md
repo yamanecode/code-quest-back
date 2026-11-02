@@ -59,3 +59,4 @@ Each requirement has an ID, the requirement and its acceptance criterion. Functi
 | RNF-02 | AI provider replaceable by configuration | The server runs with `LLM_PROVIDER=fake`; the provider is chosen only by environment variables. |
 | RNF-03 | The application keeps working when the AI fails | With the AI failing, hint requests return 200 with the fallback hint and review still returns `rule_violations`. |
 | RNF-05 | Error messages in Portuguese | Every error response has `detail` (code) and a Portuguese `message`. |
+| RNF-06 | Concurrent requests by one student return no 5xx | 8 parallel correct submissions on one challenge return one 200 with XP and 409 `already_solved` for the rest; exactly one XP event exists. |

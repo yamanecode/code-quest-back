@@ -6,4 +6,8 @@ class LLMError(Exception):
 
 
 class LLMClient(Protocol):
-    def complete(self, system: str, user: str, *, max_tokens: int) -> str: ...
+    def complete(
+        self, system: str, user: str, *, max_tokens: int, timeout_seconds: float | None = None
+    ) -> str:
+        """The model's reply; `timeout_seconds=None` uses the adapter's default."""
+        ...

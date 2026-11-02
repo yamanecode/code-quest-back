@@ -1,4 +1,6 @@
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -118,3 +120,28 @@ def test_T_AI_FAKE_04_review_text_and_prompts_appended_to_the_log(tmp_path):
         {"system": review.system, "user": review.user},
         {"system": hint.system, "user": hint.user},
     ]
+
+
+def test_T_AI_FAKE_05_delay_longer_than_the_timeout_fails_like_a_timeout():
+    slow = FakeLLMClient(replies=["tarde demais"], delay_seconds=0.5)
+    quick = FakeLLMClient(replies=["a tempo"], delay_seconds=0.01)
+
+    started = time.monotonic()
+    with pytest.raises(LLMError):
+        slow.complete("s", "u", max_tokens=5, timeout_seconds=0.05)
+    waited = time.monotonic() - started
+
+    assert waited < 0.4  # gave up at the timeout, not after the whole delay
+    assert quick.complete("s", "u", max_tokens=5, timeout_seconds=1) == "a tempo"
+    assert slow.prompts[0].timeout_seconds == 0.05
+
+
+def test_T_AI_FAKE_06_scripted_replies_are_used_once_under_parallel_calls():
+    replies = [f"resposta {n}" for n in range(40)]
+    fake = FakeLLMClient(replies=replies)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda n: fake.complete("s", f"u{n}", max_tokens=5), range(40)))
+
+    assert sorted(results) == sorted(replies)
+    assert len(fake.prompts) == 40

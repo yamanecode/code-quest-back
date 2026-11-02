@@ -2,7 +2,7 @@
 
 Requirements of `docs/requirements.md` and the functional tests that prove them.
 
-passed: 40 · failed: 0 · MISSING: 0 · manual: 3
+passed: 41 · failed: 0 · MISSING: 0 · manual: 3
 
 | ID | Requirement | Tests | Status |
 |---|---|---|---|
@@ -49,3 +49,4 @@ passed: 40 · failed: 0 · MISSING: 0 · manual: 3
 | RNF-02 | AI provider replaceable by configuration | `tests/functional/ai/test_prompts.py::test_FT_AI_14_server_uses_the_provider_chosen_by_configuration` | passed |
 | RNF-03 | The application keeps working when the AI fails | `tests/functional/ai/test_prompts.py::test_FT_AI_15_application_keeps_working_when_the_ai_fails` | passed |
 | RNF-05 | Error messages in Portuguese | `tests/functional/auth/test_auth.py::test_FT_AUTH_09_error_responses_have_a_code_and_a_portuguese_message` | passed |
+| RNF-06 | Concurrent requests by one student return no 5xx | `tests/functional/student/test_play.py::test_FT_STU_15_parallel_correct_answers_give_xp_once_and_no_server_error` | passed |

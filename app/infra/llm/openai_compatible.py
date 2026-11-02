@@ -24,7 +24,9 @@ class OpenAICompatibleClient:
         self.reasoning_effort = reasoning_effort
         self.http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
 
-    def complete(self, system: str, user: str, *, max_tokens: int) -> str:
+    def complete(
+        self, system: str, user: str, *, max_tokens: int, timeout_seconds: float | None = None
+    ) -> str:
         body = {
             "model": self.model,
             "messages": [
@@ -38,9 +40,10 @@ class OpenAICompatibleClient:
         if self.reasoning_effort:
             body["reasoning_effort"] = self.reasoning_effort
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        timeout = httpx.USE_CLIENT_DEFAULT if timeout_seconds is None else timeout_seconds
         # Error messages name only the failure type: the prompt must never reach the logs.
         try:
-            response = self.http.post(self.url, json=body, headers=headers)
+            response = self.http.post(self.url, json=body, headers=headers, timeout=timeout)
             response.raise_for_status()
             text = response.json()["choices"][0]["message"]["content"]
         except httpx.HTTPError as error:

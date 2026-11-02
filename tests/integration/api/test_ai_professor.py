@@ -326,3 +326,15 @@ def test_T_AI_PROMPT_03_no_prompt_carries_personal_data_or_turma_names(
         for secret in ("joana_q7", "987654", "Turma Girassol Secreta", "prof_ana"):
             assert secret not in text
     assert CONTENT[challenge.type]["items"][0]["text"] in llm.prompts[0].user
+
+
+def test_T_AI_TIMEOUT_02_review_waits_10_seconds_and_a_draft_30(
+    client, session, professor, headers, llm
+):
+    challenge = make_challenge(session, owner=professor, status=ContentStatus.DRAFT)
+    llm.replies.extend(["Está claro.", draft_reply()])
+
+    client.post(f"/api/professor/challenges/{challenge.id}/ai-review", headers=headers)
+    request_draft(client, headers)
+
+    assert [prompt.timeout_seconds for prompt in llm.prompts] == [10, 30]

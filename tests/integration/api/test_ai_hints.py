@@ -8,11 +8,13 @@ from app.core.ports import LLMError
 from app.domain.challenge_types import ChallengeType
 from app.domain.enums import ContentStatus, HintSource, Role
 from app.domain.hint_leak import hint_reveals_solution
-from app.infra.db.models import HintEvent
+from app.infra.db.models import HintEvent, Submission
+from app.services import ai_service
 from app.services.ai_service import FALLBACK_HINTS, NEUTRAL_HINT
 from tests.integration.answers import as_student
 from tests.integration.auth_helpers import bearer
 from tests.integration.factories import (
+    hint,
     make_challenge,
     make_classroom,
     make_mission,
@@ -268,10 +270,10 @@ def test_T_AI_FALLBACK_04_fallback_matching_the_answer_is_replaced_by_a_neutral_
     assert hint_reveals_solution(ChallengeType.PATTERN, challenge.content, only_leaking[0])
     llm.replies.append(LLMError("down"))
 
-    hint = ask_hint(client, headers, challenge).json()["hint"]
+    shown = ask_hint(client, headers, challenge).json()["hint"]
 
-    assert hint == NEUTRAL_HINT
-    assert not hint_reveals_solution(ChallengeType.PATTERN, challenge.content, hint)
+    assert shown == NEUTRAL_HINT
+    assert not hint_reveals_solution(ChallengeType.PATTERN, challenge.content, shown)
 
 
 def test_T_AI_FALLBACK_05_leaking_variant_is_skipped_for_a_safe_one(
@@ -324,3 +326,58 @@ def test_T_AI_FALLBACK_07_level_3_rotates_through_its_variants_and_then_cycles(
     )
     assert shown[2:] == [level_3[i % len(level_3)] for i in range(6)]
     assert all(a != b for a, b in pairwise(shown[2:]))
+
+
+def test_T_AI_HINT_08_a_crash_in_the_hint_step_keeps_the_submission(
+    client, session, student, headers, challenge, llm
+):
+    llm.replies.append(RuntimeError("defeito inesperado"))
+
+    response = submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING])
+
+    assert response.status_code == 200
+    assert response.json()["is_correct"] is False
+    assert response.json()["hint"] is None
+    assert len(session.scalars(select(Submission).filter_by(user_id=student.id)).all()) == 1
+    assert hint_events(session, student) == []
+
+
+def test_T_AI_HINT_09_a_hint_past_its_timeout_still_saves_the_wrong_answer(
+    client, session, student, headers, challenge, llm, monkeypatch
+):
+    monkeypatch.setattr(ai_service, "HINT_TIMEOUT_SECONDS", 0.05)
+    llm.delay_seconds = 1.0
+    llm.replies.extend([SAFE_HINT, SAFE_HINT])
+
+    response = submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING])
+
+    assert response.status_code == 200
+    assert response.json()["hint"] in FALLBACK_HINTS[ChallengeType.ORDERING][1]
+    assert len(session.scalars(select(Submission).filter_by(user_id=student.id)).all()) == 1
+
+
+def test_T_AI_TIMEOUT_01_hints_wait_at_most_10_seconds(client, headers, challenge, llm):
+    llm.replies.extend([SAFE_HINT, SAFE_HINT])
+
+    submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING])
+    ask_hint(client, headers, challenge)
+
+    assert [prompt.timeout_seconds for prompt in llm.prompts] == [10, 10]
+
+
+def test_T_STU_CHAL_HINTS_01_challenge_view_lists_own_shown_hints_oldest_first(
+    client, session, headers, challenge, llm, clock
+):
+    other = make_user(session, "outra")
+    hint(session, other, challenge, text="Dica de outra pessoa.")
+    assert view(client, headers, challenge)["hints_shown"] == []
+    llm.replies.extend(["Confira o primeiro passo. Qual seria?", SAFE_HINT])
+
+    submit(client, headers, challenge, WRONG_ANSWER[ChallengeType.ORDERING])
+    clock.advance(timedelta(seconds=1))
+    ask_hint(client, headers, challenge)
+
+    assert view(client, headers, challenge)["hints_shown"] == [
+        {"level": 1, "source": "after_wrong", "text": "Confira o primeiro passo. Qual seria?"},
+        {"level": 1, "source": "request", "text": SAFE_HINT},
+    ]

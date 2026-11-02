@@ -1,3 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
+import httpx
 import pytest
 
 from tests.functional.helpers import (
@@ -5,6 +9,7 @@ from tests.functional.helpers import (
     TYPES,
     Account,
     LlmLog,
+    as_student,
     assert_error,
     base_challenge,
     base_files,
@@ -16,6 +21,7 @@ from tests.functional.helpers import (
     item_texts,
     join,
     new_classroom,
+    new_client,
     new_mission,
     profile,
     publish_mission,
@@ -373,3 +379,32 @@ def test_FT_STU_13_item_ids_and_order_do_not_give_the_answer_away(new_student):
 
     assert real_answer_checked
     assert orders_differ
+
+
+@pytest.mark.req("RNF-06")
+def test_FT_STU_15_parallel_correct_answers_give_xp_once_and_no_server_error(
+    professor: Account, student: Account
+):
+    turma = turma_with_mission(professor, ("ordering",))
+    challenge = turma.challenges[0]
+    join(student, turma.join_code)
+    answer = as_student(student, challenge, correct_answer("ordering", challenge["content"]))
+    barrier = Barrier(8)
+
+    def answer_at_once(_: int) -> httpx.Response:
+        with new_client(student.token) as client:
+            barrier.wait()
+            return client.post(
+                f"/api/challenges/{challenge['id']}/submissions", json={"answer": answer}
+            )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        responses = list(pool.map(answer_at_once, range(8)))
+
+    assert sorted(response.status_code for response in responses) == [200] + [409] * 7
+    [winner] = [response.json() for response in responses if response.status_code == 200]
+    assert winner["xp_earned"] == 10
+    for response in responses:
+        if response.status_code == 409:
+            assert_error(response, 409, "already_solved")
+    assert profile(student)["xp"] == 10  # exactly one XP event

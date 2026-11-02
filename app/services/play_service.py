@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,6 +17,8 @@ from app.domain.novelty import MissionCandidate, is_new, next_challenge
 from app.infra.db.models import Challenge, Mission
 from app.infra.repositories.challenges import ChallengeRepository
 from app.infra.repositories.classrooms import ClassroomRepository
+from app.infra.repositories.hints import HintRepository
+from app.infra.repositories.locks import lock_user
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.infra.repositories.xp import XPRepository
@@ -24,6 +27,8 @@ from app.services.classroom_service import ClassroomService
 from app.services.exceptions import NotFound, ValidationFailed
 from app.services.gamification_service import BadgeInfo, GamificationService
 from app.services.guards import already_solved
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,13 @@ class MissionDetail:
 
 
 @dataclass(frozen=True)
+class ShownHint:
+    level: int
+    source: str
+    text: str
+
+
+@dataclass(frozen=True)
 class StudentChallenge:
     """A challenge as the student sees it: no solution, no explanation."""
 
@@ -82,6 +94,7 @@ class StudentChallenge:
     is_new: bool
     explanation: str | None
     cooldown_seconds_left: int
+    hints_shown: list[ShownHint]
 
 
 @dataclass(frozen=True)
@@ -177,6 +190,7 @@ class PlayService:
         self.classrooms = ClassroomRepository(session)
         self.submissions = SubmissionRepository(session)
         self.xp = XPRepository(session)
+        self.hints = HintRepository(session)
 
     def list_missions(self, user_id: int) -> MissionList:
         visible = self.missions.visible_missions(user_id)
@@ -243,9 +257,17 @@ class PlayService:
             # Shown again once solved, so a closed challenge can still be reviewed.
             explanation=challenge.explanation if solved else None,
             cooldown_seconds_left=self.ai.cooldown_seconds_left(user_id, challenge_id),
+            # So the hints come back after a reload of the page.
+            hints_shown=[
+                ShownHint(event.level, event.source, event.text)
+                for event in self.hints.shown_hints(user_id, challenge_id)
+            ],
         )
 
     def submit(self, user_id: int, challenge_id: int, answer: dict) -> SubmissionResult:
+        # One student's writes run one at a time: a parallel submit waits here and then
+        # sees this one's commit, so "already solved" below is checked against fresh data.
+        lock_user(self.session, user_id)
         challenge = self._visible_challenge(user_id, challenge_id)
         if self.submissions.has_solved(user_id, challenge_id):
             raise already_solved()
@@ -262,7 +284,6 @@ class PlayService:
         self.submissions.add(user_id, challenge_id, answer, is_correct, now)
         xp_earned = 0
         new_badges = []
-        hint = None
         if is_correct:
             wrong = self.submissions.wrong_attempts(user_id, challenge_id)
             xp_earned = xp_for_wrong_attempts(wrong)
@@ -270,9 +291,9 @@ class PlayService:
             # Goal rewards first, so a class_goal badge is among the submitter's new badges.
             self.goals.reward_completed_goals(user_id, challenge_id)
             new_badges = self.gamification.award_new_badges(user_id)
-        else:
-            hint = self.ai.hint_after_wrong(user_id, challenge, answer)
+        # Saved before any model call: a slow or failing AI never loses the answer.
         self.session.commit()
+        hint = None if is_correct else self._hint_after_wrong(user_id, challenge, answer)
 
         xp = before.xp + xp_earned
         level = level_for(xp)
@@ -310,6 +331,16 @@ class PlayService:
             challenge_title=challenge.title,
             is_new=_challenge_is_new(challenge, answered, self.clock.now()),
         )
+
+    def _hint_after_wrong(self, user_id: int, challenge: Challenge, answer: dict) -> str | None:
+        """The automatic hint, or None; any failure here leaves the saved submission alone."""
+        try:
+            return self.ai.hint_after_wrong(user_id, challenge, answer)
+        except Exception as error:
+            self.session.rollback()
+            # Only the error type: the message could carry parts of the prompt.
+            logger.error("Hint after a wrong answer failed: %s", type(error).__name__)
+            return None
 
     def _visible_challenge(self, user_id: int, challenge_id: int) -> Challenge:
         # Drafts, challenges of other turmas and missing ids all look the same.

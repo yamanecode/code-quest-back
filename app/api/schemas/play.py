@@ -40,6 +40,12 @@ class MissionDetailOut(BaseModel):
     challenges: list[ChallengeSummaryOut]
 
 
+class ShownHintOut(BaseModel):
+    level: int
+    source: str
+    text: str
+
+
 class ChallengeForStudentOut(BaseModel):
     """Student view of a challenge: never carries the solution or the explanation."""
 
@@ -53,6 +59,7 @@ class ChallengeForStudentOut(BaseModel):
     is_new: bool
     explanation: str | None
     cooldown_seconds_left: int
+    hints_shown: list[ShownHintOut]
 
 
 class HintOut(BaseModel):

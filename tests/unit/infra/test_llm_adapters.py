@@ -141,3 +141,18 @@ def test_T_AI_FAKE_00_scripted_replies_in_order_and_prompts_recorded():
         ("s3", "u3"),
         ("s4", "u4"),
     ]
+
+
+def test_T_AI_OPENAI_04_timeout_reaches_the_request_and_none_keeps_the_client_default():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.extensions["timeout"])
+        return chat_reply("ok")
+
+    client = client_answering(handler)
+    client.complete("s", "u", max_tokens=10, timeout_seconds=10)
+    client.complete("s", "u", max_tokens=10)
+
+    assert seen[0] == httpx.Timeout(10).as_dict()
+    assert seen[1] == client.http.timeout.as_dict()

@@ -98,6 +98,7 @@ def test_FT_AI_05_first_wrong_answer_brings_one_automatic_hint(
     assert first["is_correct"] is False
     assert isinstance(first["hint"], str) and first["hint"].strip()
     assert view["cooldown_seconds_left"] == 0
+    assert view["hints_shown"] == [{"level": 1, "source": "after_wrong", "text": first["hint"]}]
     assert [result["hint"] for result in later] == [None, None]
     assert len(prompts) == 1
     assert appears_in_order(prompts[0], [texts[item] for item in answer["order"]])

@@ -20,7 +20,8 @@ from app.domain.hint_leak import hint_reveals_solution
 from app.domain.hints import cooldown_left, hint_level, pick_variant
 from app.infra.db.models import Challenge
 from app.infra.repositories.challenges import ChallengeRepository
-from app.infra.repositories.hints import HintRepository
+from app.infra.repositories.hints import HintRepository, HintUsage
+from app.infra.repositories.locks import lock_user
 from app.infra.repositories.missions import MissionRepository
 from app.infra.repositories.submissions import SubmissionRepository
 from app.services.content_service import ChallengeView, ContentService, draft_of
@@ -44,6 +45,10 @@ HINT_MAX_TOKENS = 1000
 REVIEW_MAX_TOKENS = 1500
 DRAFT_MAX_TOKENS = 1200
 DRAFT_ATTEMPTS = 2
+# Seconds: a student waits for a hint and a professor for a review; a draft is longer.
+HINT_TIMEOUT_SECONDS = 10
+REVIEW_TIMEOUT_SECONDS = 10
+DRAFT_TIMEOUT_SECONDS = 30
 
 # Generic per type, never about one challenge. Level 1 is also the pool of the automatic hint.
 # Each pool has several variants so the same sentence is not shown twice in a row.
@@ -215,61 +220,91 @@ class AIService:
         usage = self.hints.requested_hints(user_id, challenge_id)
         return cooldown_left(usage.last_shown_at, self.clock.now(), self.cooldown_seconds)
 
+    # Both hint paths: short check under the user lock, commit (which releases the lock),
+    # call the model with no lock held, then lock again, check again and store or drop.
+
     def request_hint(self, user_id: int, challenge_id: int) -> HintResult:
+        lock_user(self.session, user_id)
         if challenge_id not in self.missions.visible_published_challenge_ids(user_id):
             raise NotFound("challenge_not_found", "Desafio não encontrado.")
         if self.submissions.has_solved(user_id, challenge_id):
             raise already_solved()
         usage = self.hints.requested_hints(user_id, challenge_id)
-        now = self.clock.now()
-        wait = cooldown_left(usage.last_shown_at, now, self.cooldown_seconds)
+        self._check_cooldown(usage)
+        level = hint_level(usage.count)
+        draft = draft_of(self.challenges.get(challenge_id))
+        previous = self.hints.shown_texts(user_id, challenge_id)
+        self.session.commit()
+
+        text, discarded = self._safe_hint(draft, level, previous)
+
+        lock_user(self.session, user_id)
+        # A parallel request may have shown a hint while this one waited for the model.
+        self._check_cooldown(self.hints.requested_hints(user_id, challenge_id))
+        self.hints.add(
+            user_id, challenge_id, HintSource.REQUEST, level, text, discarded, self.clock.now()
+        )
+        self.session.commit()
+        return HintResult(hint=text, level=level, cooldown_seconds=self.cooldown_seconds)
+
+    def hint_after_wrong(self, user_id: int, challenge: Challenge, answer: dict) -> str | None:
+        """Level-1 hint for the first wrong answer; runs after the submission is committed."""
+        challenge_id = challenge.id
+        if self.hints.after_wrong_hint_exists(user_id, challenge_id):
+            return None
+        draft = draft_of(challenge)
+        previous = self.hints.shown_texts(user_id, challenge_id)
+        self.session.commit()
+
+        text, discarded = self._safe_hint(draft, 1, previous, answer)
+
+        lock_user(self.session, user_id)
+        if self.hints.after_wrong_hint_exists(user_id, challenge_id):
+            # A parallel wrong answer stored its hint first; only one is ever shown.
+            self.session.commit()
+            return None
+        self.hints.add(
+            user_id, challenge_id, HintSource.AFTER_WRONG, 1, text, discarded, self.clock.now()
+        )
+        self.session.commit()
+        return text
+
+    def _check_cooldown(self, usage: HintUsage) -> None:
+        wait = cooldown_left(usage.last_shown_at, self.clock.now(), self.cooldown_seconds)
         if wait > 0:
             raise RateLimited(
                 "hint_cooldown", "Aguarde alguns segundos para pedir outra dica.", retry_after=wait
             )
 
-        challenge = self.challenges.get(challenge_id)
-        level = hint_level(usage.count)
-        text, discarded = self._safe_hint(user_id, challenge, level)
-        self.hints.add(user_id, challenge_id, HintSource.REQUEST, level, text, discarded, now)
-        self.session.commit()
-        return HintResult(hint=text, level=level, cooldown_seconds=self.cooldown_seconds)
-
-    def hint_after_wrong(self, user_id: int, challenge: Challenge, answer: dict) -> str | None:
-        """Level-1 hint for the first wrong answer; the caller commits."""
-        if self.hints.after_wrong_hint_exists(user_id, challenge.id):
-            return None
-        text, discarded = self._safe_hint(user_id, challenge, 1, answer)
-        self.hints.add(
-            user_id, challenge.id, HintSource.AFTER_WRONG, 1, text, discarded, self.clock.now()
-        )
-        return text
-
     def _safe_hint(
-        self, user_id: int, challenge: Challenge, level: int, answer: dict | None = None
+        self, draft: ChallengeDraft, level: int, previous: list[str], answer: dict | None = None
     ) -> tuple[str, int]:
-        """A hint that passed the leak check, or the fallback; also how many were discarded."""
-        previous = self.hints.shown_texts(user_id, challenge.id)
+        """A hint that passed the leak check, or the fallback; also how many were discarded.
+
+        Touches no database: it runs while no transaction is open.
+        """
         discarded = 0
         for strict in (False, True):
-            prompt = hint_prompt(draft_of(challenge), level, previous, answer, strict)
-            reply = self._ask(prompt, HINT_MAX_TOKENS)
+            prompt = hint_prompt(draft, level, previous, answer, strict)
+            reply = self._ask(prompt, HINT_MAX_TOKENS, HINT_TIMEOUT_SECONDS)
             if reply is None:
                 break
-            if not hint_reveals_solution(challenge.type, challenge.content, reply):
+            if not hint_reveals_solution(draft.type, draft.content, reply):
                 return reply, discarded
             discarded += 1
         safe = tuple(
             text
-            for text in FALLBACK_HINTS[challenge.type][level]
-            if not hint_reveals_solution(challenge.type, challenge.content, text)
+            for text in FALLBACK_HINTS[draft.type][level]
+            if not hint_reveals_solution(draft.type, draft.content, text)
         )
         return (pick_variant(safe, previous) if safe else NEUTRAL_HINT), discarded
 
-    def _ask(self, prompt: Prompt, max_tokens: int) -> str | None:
+    def _ask(self, prompt: Prompt, max_tokens: int, timeout_seconds: float) -> str | None:
         """The model's reply, or None when it failed or said nothing."""
         try:
-            reply = self.llm.complete(prompt.system, prompt.user, max_tokens=max_tokens)
+            reply = self.llm.complete(
+                prompt.system, prompt.user, max_tokens=max_tokens, timeout_seconds=timeout_seconds
+            )
         except LLMError as error:
             logger.warning("LLM call failed: %s", error)
             return None
@@ -282,7 +317,7 @@ class AIService:
 
     def review(self, professor_id: int, challenge_id: int) -> Review:
         draft = self.content.get_draft(professor_id, challenge_id)
-        suggestions = self._ask(review_prompt(draft), REVIEW_MAX_TOKENS)
+        suggestions = self._ask(review_prompt(draft), REVIEW_MAX_TOKENS, REVIEW_TIMEOUT_SECONDS)
         return Review(challenge_errors(draft), suggestions or FALLBACK_SUGGESTIONS)
 
     def draft(
@@ -302,7 +337,12 @@ class AIService:
         for _ in range(DRAFT_ATTEMPTS):
             prompt = draft_prompt(challenge_type, topic.strip(), texts, errors)
             try:
-                reply = self.llm.complete(prompt.system, prompt.user, max_tokens=DRAFT_MAX_TOKENS)
+                reply = self.llm.complete(
+                    prompt.system,
+                    prompt.user,
+                    max_tokens=DRAFT_MAX_TOKENS,
+                    timeout_seconds=DRAFT_TIMEOUT_SECONDS,
+                )
             except LLMError as error:
                 logger.warning("LLM call failed: %s", error)
                 raise ServiceUnavailable(

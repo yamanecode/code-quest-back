@@ -7,6 +7,7 @@ from app.core.clock import Clock
 from app.domain.gamification import goal_reached, goal_target, week_start
 from app.infra.db.models import Classroom
 from app.infra.repositories.classrooms import ClassroomRepository
+from app.infra.repositories.locks import lock_classroom, lock_user
 from app.services.exceptions import NotFound
 from app.services.gamification_service import GamificationService
 
@@ -59,6 +60,7 @@ class ClassroomService:
         self.classrooms = ClassroomRepository(session)
 
     def join(self, user_id: int, join_code: str) -> ClassroomRef:
+        lock_user(self.session, user_id)  # a double click joins once
         classroom = self.classrooms.get_by_join_code(join_code.strip().upper())
         # A closed turma answers like a wrong code, so its code reveals nothing.
         if classroom is None or classroom.closed:
@@ -69,6 +71,7 @@ class ClassroomService:
         return ClassroomRef(classroom.id, classroom.name)
 
     def leave(self, user_id: int, classroom_id: int) -> None:
+        lock_user(self.session, user_id)
         membership = self.classrooms.get_membership(user_id, classroom_id)
         if membership is None:
             raise NotFound("classroom_not_found", "Turma não encontrada.")
@@ -95,6 +98,9 @@ class ClassroomService:
         """
         now = self.clock.now()
         for classroom in self.classrooms.goal_classrooms(user_id, challenge_id):
+            # Members finishing together: the second waits here and then counts both solves.
+            # Turmas come in id order, so two submits never wait for each other's locks.
+            lock_classroom(self.session, classroom.id)
             goal = class_goal(self.classrooms, classroom, now)
             if goal is None or not goal.completed:
                 continue

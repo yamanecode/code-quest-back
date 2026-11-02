@@ -67,10 +67,14 @@ class HintRepository:
         )
         return bool(self.session.scalar(select(condition)))
 
-    def shown_texts(self, user_id: int, challenge_id: int) -> list[str]:
+    def shown_hints(self, user_id: int, challenge_id: int) -> list[HintEvent]:
+        """Every hint this student was shown on this challenge, oldest first."""
         query = (
-            select(HintEvent.text)
+            select(HintEvent)
             .where(*self._own(user_id, challenge_id))
             .order_by(HintEvent.created_at, HintEvent.id)
         )
         return list(self.session.scalars(query))
+
+    def shown_texts(self, user_id: int, challenge_id: int) -> list[str]:
+        return [event.text for event in self.shown_hints(user_id, challenge_id)]

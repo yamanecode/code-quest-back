@@ -1,5 +1,7 @@
 import json
 import re
+import threading
+import time
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -113,6 +115,7 @@ _EASY_CONTENT = {
 class RecordedPrompt:
     system: str
     user: str
+    timeout_seconds: float | None = None
 
 
 class FakeLLMClient:
@@ -127,25 +130,46 @@ class FakeLLMClient:
     Triggers: "[fake:error]" anywhere fails the call, "[fake:leak]" makes a hint echo the
     prompt (which holds the solution), "[fake:invalid]" makes a draft that is not JSON and
     "[fake:easy]" a draft that breaks the draft rules.
+
+    `delay_seconds` makes every call slow; a call whose timeout is shorter than the delay
+    waits only the timeout and then fails, like a provider that did not answer in time.
+    Safe to share between threads (parallel requests in tests).
     """
 
     def __init__(
-        self, replies: Iterable[str | Exception] | None = None, log_path: str | None = None
+        self,
+        replies: Iterable[str | Exception] | None = None,
+        log_path: str | None = None,
+        delay_seconds: float = 0.0,
     ) -> None:
         self.scripted = replies is not None
         self.replies = deque(replies or [])
         self.log_path = log_path
+        self.delay_seconds = delay_seconds
         self.prompts: list[RecordedPrompt] = []
+        self._lock = threading.Lock()
 
-    def complete(self, system: str, user: str, *, max_tokens: int) -> str:
-        self.prompts.append(RecordedPrompt(system, user))
-        if self.log_path:
-            line = json.dumps({"system": system, "user": user}, ensure_ascii=False)
-            with Path(self.log_path).open("a", encoding="utf-8") as log:
-                log.write(line + "\n")
+    def complete(
+        self, system: str, user: str, *, max_tokens: int, timeout_seconds: float | None = None
+    ) -> str:
+        with self._lock:
+            self.prompts.append(RecordedPrompt(system, user, timeout_seconds))
+            if self.log_path:
+                line = json.dumps({"system": system, "user": user}, ensure_ascii=False)
+                with Path(self.log_path).open("a", encoding="utf-8") as log:
+                    log.write(line + "\n")
+        self._wait(timeout_seconds)
         if self.scripted:
             return self._next_reply()
         return self._server_reply(user)
+
+    def _wait(self, timeout_seconds: float | None) -> None:
+        if not self.delay_seconds:
+            return
+        if timeout_seconds is not None and self.delay_seconds > timeout_seconds:
+            time.sleep(timeout_seconds)
+            raise LLMError("fake timeout")
+        time.sleep(self.delay_seconds)
 
     def _server_reply(self, user: str) -> str:
         if "[fake:error]" in user:
@@ -162,9 +186,10 @@ class FakeLLMClient:
         return FAKE_REVIEW
 
     def _next_reply(self) -> str:
-        if not self.replies:
-            raise LLMError("no scripted reply left")
-        reply = self.replies.popleft()
+        with self._lock:
+            if not self.replies:
+                raise LLMError("no scripted reply left")
+            reply = self.replies.popleft()
         if isinstance(reply, Exception):
             raise reply
         return reply

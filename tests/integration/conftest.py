@@ -4,9 +4,10 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_clock, get_llm_client, get_login_limiter
 from app.core.attempt_limiter import AttemptLimiter
@@ -80,3 +81,29 @@ def client(
     app.dependency_overrides[get_login_limiter] = lambda: limiter
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def parallel_app(
+    engine: Engine,
+    session: Session,
+    clock: FixedClock,
+    llm: FakeLLMClient,
+    limiter: AttemptLimiter,
+) -> FastAPI:
+    """App for parallel requests: each request opens its own session, as in production.
+
+    Rows must be committed to be seen; the truncate of the `session` fixture cleans them.
+    """
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def own_session() -> Iterator[Session]:
+        with sessions() as request_session:
+            yield request_session
+
+    app = create_app()
+    app.dependency_overrides[get_session] = own_session
+    app.dependency_overrides[get_clock] = lambda: clock
+    app.dependency_overrides[get_llm_client] = lambda: llm
+    app.dependency_overrides[get_login_limiter] = lambda: limiter
+    return app
